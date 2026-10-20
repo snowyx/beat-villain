@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "ElevenLabs 三语咒语预生成脚本 scripts/generate-audio.mjs（本次不运行、key 不入库）+ assets/audio/README.md 占位说明。对应 tasks.md 第 15–16 项、design §12、requirements 8。依赖 FEAT-001（scripts/ 与 assets/audio/ 目录）。独立于 FEAT-002/003。",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "scripts/generate-audio.mjs（Node ESM，本次不运行）：仅从 process.env.ELEVENLABS_API_KEY 读 key，未设置则 console.error 提示『请先 export ELEVENLABS_API_KEY=... 再运行』并 process.exit(1)，绝不硬编码/写占位 key；内置与 requirements 3.2 一致的三语 SPELL_TEXT(注释标注须与 requirements 同步)；对 zh-CN/zh-HK/en-US 各调一次 ElevenLabs TTS(Node18+ 内置 fetch，voiceId 从环境变量/脚本顶部常量配置且非密钥)，写 assets/audio/spell-<lang>.mp3；每请求 try/catch、HTTP 非 2xx 打印状态码与响应摘要并跳过该语言、汇总成功/失败数、401/403 明确提示检查 key；写文件失败打印路径与错误；日志仅打印『已读取 key(已隐藏)』不打印完整 key；文末注释说明生成成功后把 app/js/config.js 的 AUDIO_MANIFEST 对应项置 true。",
     "assets/audio/README.md：说明存放 spell-zh-CN.mp3/spell-zh-HK.mp3/spell-en-US.mp3(命名同 requirements 8.6)；本次缺省为空→运行时 Web Speech 回退；由 scripts/generate-audio.mjs 在设置 ELEVENLABS_API_KEY 后生成；生成后手动把 config.js AUDIO_MANIFEST 对应项置 true。"
@@ -18,5 +18,5 @@
     "grep -i 'sk-\\|api_key\\|apikey' scripts/generate-audio.mjs 确认无硬编码 key 值"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "已创建 scripts/generate-audio.mjs（Node ESM，本次不运行）与 assets/audio/README.md。脚本只从 process.env.ELEVENLABS_API_KEY 读 key，未设置则打印缺 key 提示并 process.exit(1)，不产 mp3、不泄 key、无硬编码/占位 key。SPELL_TEXT 三语文案与 requirements.md 3.2 一致（zh-CN/zh-HK/en-US），注释已标注须同步。TTS 用 Node18+ 内置 fetch 调 ElevenLabs，每语言 try/catch、非 2xx 打状态码+响应摘要并跳过、401/403 提示检查 key、汇总成功/失败数、有失败则非零退出；voiceId/model_id 从环境变量或顶部常量配置（非密钥），默认 voiceId=EXAVITQu4vr4xnSDxMaL(Rachel 占位)、model=eleven_multilingual_v2。输出命名 spell-<lang>.mp3，与 requirements 8.6 / app/js/config.js 的 AUDIO_MANIFEST 一致。文末提示生成成功后手动把 config.js AUDIO_MANIFEST 对应项置 true。验证通过：env -u ELEVENLABS_API_KEY 运行 exit=1、assets/audio 仅 .gitkeep+README.md 无 mp3、grep 无硬编码 key 值（'xi-api-key' 为 HTTP 头名非密钥）、node --check 语法通过。注意：根目录 README.md 是 tasks.md 第 17 项（独立任务），不属 FEAT-004，本步未创建。下游若生成真实 mp3，需手动改 config.js 对应项为 true。.gitignore 已忽略 .env 与 assets/audio/*.mp3，本步只 stage 新建的脚本与 README.md。"
 }
