@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "前端 H5 竖屏单页完整玩法循环 + 港式霓虹纸扎风 + WebSocket 客户端同步 + 三级音频回退 + canvas 小人 + canvas 分享图 + 合规拦截。对应 tasks.md 第 8–14 项、design §2/§6/§8/§9/§10/§11/§13。依赖 FEAT-002（后端协议对端可联调）与 FEAT-001（app/ 目录与 steering）。这是最大一块，步骤多但为一个连贯可运行单元。",
+  "status": "pending",
+  "steps": [
+    "搭容器与配置：app/index.html（375px 竖屏骨相、同页六流程态容器 altar/invite/spell/beat/ash/fortune、页脚合规声明、ES Module 引入 js/main.js 与 vendor/qrcode.min.js）；app/js/config.js（WS_URL 按 design §13：localStorage 覆盖 > localhost 默认 ws://localhost:8080 > 线上占位 wss://REPLACE_WITH_ROOM_SERVER_HOST；TARGET_HITS:88；AUDIO_MANIFEST 三者 false）；vendored app/vendor/qrcode.min.js（轻量 UMD 二维码库，离线可用，不走 npm 运行时依赖）。",
+    "app/css/theme.css：依 steering 视觉风格与 design §9——配色 CSS 变量、霓虹辉光 text/box-shadow、港式招牌楷体栈、375px 居中骨相 + 底部操作条、金边纸纹卡片、节制的辉光呼吸动画、横屏轻提示。",
+    "app/js/ws-client.js：连接 CONFIG.WS_URL、首帧发 hello 带 sessionStorage 旧 clientId、收发 JSON 帧按 type 分发、断线重连；对 hits 取 Math.max 单调递增防回退。app/js/store.js：结构性状态(phase/lang/flower/crimes/members/fortune/burned)以 room_state 为准，高频 hits/villainStage 以 hit/villain_state 增量帧为准。app/js/main.js：location.hash 路由(检测 #/join?room= 自动带入房间码)、按 snapshot.phase 唯一路由切屏、装配各 screen。",
+    "app/js/compliance.js：design §10 花名拦截纯函数（trim 长度 1–12、2–4 纯汉字且首字命中内置约 100 常见姓氏/复姓表、姓+称谓结尾判疑似真名，整活花名/非中文/含数字符号/花名特征词放行）+ 随机花名生成；设计为可被 node:test 直接导入的纯函数。",
+    "app/js/audio.js：三级回退 mp3 优先→Web Speech(u.lang zh-CN/zh-HK/en-US)→文字兜底；zh-HK 走 Web Speech 时同屏显示粤语咒语原文；首个用户手势解锁音频；打击音效用 WebAudio 合成『啪』声。咒语文案与 requirements 3.2 一致。",
+    "app/js/villain.js：canvas 2D 纸片人四阶段(阈值同后端)；每收一条 hit 广播播一次阻尼正弦弹跳(单实例 tween，重入 retrigger 重置相位)+拖鞋印粒子(有上限)；化灰为金/紫祥云粒子上飘淡出 + 赛博纸钱，无任何血腥元素。",
+    "app/js/screens/altar.js(开坛表单：花名接 compliance 拦截、6 罪状多选、一键随机花名、缺失禁用提交→create_room)、invite.js(房间码+复制邀请链接+qrcode 二维码；神婆 #/join?room= 进房确认→join_room，ROOM_NOT_FOUND/ROOM_FULL 提示)、spell.js(三语选择→set_lang 全房同步、念咒调 audio、start_beat)、beat.js(挂 villain canvas、显示 hits/剩余、落鞋发 hit 并以广播渲染、本地即时手感不本地加计数)、ash.js(收 burn 播化灰+纸钱+全屏『晦气退散』)、fortune.js(收 fortune 显宜/忌/贵人、调 share-card)。",
+    "app/js/share-card.js：离屏 canvas 750×1334 竖版符咒图(夜市底+符咒框+花名+罪状牌+『共抽 N 鞋·已化灰』+宜/忌/贵人+页脚『民俗数字化体验』合规小字)；toBlob PNG；保存/分享判定顺序 navigator.canShare({files})→a[download]→提示长按；系统字体栈。",
+    "编写 app/js/compliance.test.js（node:test）：一组真名(张三/王小明/李先生)应被拦、整活花名(甩锅侠/卷王本卷/隔壁组某人)应放行。"
+  ],
+  "acceptance_criteria": [
+    "python3 -m http.server 在 app/ 起静态服务，浏览器打开首页无控制台报错，见港式霓虹首页与页脚合规声明。",
+    "后端运行时，开坛→邀请→念咒→开打到 88→化灰→签文→生成非空 PNG 分享图全流程走通，控制台无未捕获异常。",
+    "化灰仅祥云消散、无红色液体/伤口；分享图含花名/罪状/鞋数/签文/合规小字。",
+    "node --test app/js/compliance.test.js 全部通过（真名拦截、整活花名放行）。"
+  ],
+  "verification": [
+    "cd 1-kickbadguy && node --test app/js/compliance.test.js",
+    "cd 1-kickbadguy/server && npm start （后台）+ cd 1-kickbadguy/app && python3 -m http.server 5173，浏览器手测全流程",
+    "浏览器控制台确认无未捕获异常、首页/分享图合规声明在位"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

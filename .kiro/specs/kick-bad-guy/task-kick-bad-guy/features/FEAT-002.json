@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "后端单文件 Node WebSocket 内存房间服务 server/room-server.js + package.json + 单元与集成测试。对应 tasks.md 第 4–7 项、design §4/§5/§7/§15。依赖 FEAT-001（server/ 目录存在）。实现后即是前端联调的协议对端，须在 FEAT-003 前完成。",
+  "status": "pending",
+  "steps": [
+    "创建 server/package.json：type:module、dependencies.ws 固定版本(如 8.18.0)、scripts {start:'node room-server.js', test:'node --test'}、engines.node>=18。",
+    "实现 server/room-server.js（单文件，裸 new WebSocketServer({host:'0.0.0.0', port:Number(process.env.PORT)||8080})，不引入 HTTP/路径路由）：rooms:Map、socketMeta:WeakMap；纯函数 genRoomCode(6 位、排除 0/O/1/I/L、查重)、makeSnapshot(room,selfClientId)(含逐连接 isSelf 与 clientId、不外泄 ws 句柄)、recomputeStage(阈值 0–21 嚣张/22–43 懵逼/44–87 冒烟/88 化灰)、applyHit(非 beating 忽略、hits=Math.min(88,hits+1)、达 88 调 enterBurning、幂等封顶)、drawFortune(§7 签文库宜/忌/贵人各列抽一、写入后锁定幂等)；broadcast/broadcastSnapshot(逐连接填 isSelf)/singleSend(发送前 readyState===OPEN)；enterBurning(phase=burning,burned=true,广播 burn→drawFortune→phase=fortune,广播 fortune)；cleanupRoom(在线成员为 0 延时 60s 后若仍空则 rooms.delete)。",
+    "实现消息路由遵守首帧契约：连接后强制先收 hello（无 clientId 生成新/带旧 clientId 命中则重连认领原槽 online=true 不占新槽不触发 ROOM_FULL）→回 hello_ok{clientId}；hello_ok 前的业务消息回 BAD_PAYLOAD 忽略；之后按 type 路由 create_room/join_room/set_lang/start_beat/hit/ping。phase 变更一律随 room_state 广播。错误码：ROOM_NOT_FOUND、ROOM_FULL 下发 error 帧；BAD_PAYLOAD、PHASE_REJECTED 静默(console.debug)回一帧 room_state 不断连。房满 = 已认领 clientId 落鞋成员数达 2，仅 join_room 首次进房路径判定。close 时该成员 online=false、广播 member_change、触发 cleanupRoom 60s。",
+    "为可测性把纯函数（genRoomCode/recomputeStage/applyHit/drawFortune/makeSnapshot）做成可被测试文件导入的导出（直接从 room-server.js export，或抽到同目录模块被 room-server.js 引用）。",
+    "编写 server/room-server.test.js（node:test+assert）：genRoomCode 字符集与唯一性、applyHit 封顶与阶段推进、recomputeStage 边界(0/21/22/43/44/87/88)、drawFortune 锁定幂等、makeSnapshot 的 isSelf 逐连接正确且不含 ws 句柄、ROOM_FULL 判定按已认领 clientId 计且重连带旧 clientId 不触发房满。",
+    "编写 server/room-server.integration.test.js：用 ws 客户端起两个连接走 hello→建房→进房→切咒语→连打到 88→化灰→签文全链路，断言两端 room_state/burn/fortune 一致、hits 封顶 88、断线重连后快照对齐。"
+  ],
+  "acceptance_criteria": [
+    "cd 1-kickbadguy/server && npm install 成功装到 ws。",
+    "node --check room-server.js 通过；npm start 能监听 8080 无错(随后停止)。",
+    "npm test 单元用例全部通过（含边界 0/21/22/43/44/87/88 与 ROOM_FULL/重连判定）。",
+    "集成测试双客户端全链路通过，两端 room_state/burn/fortune 一致、hits 封顶 88、重连对齐。"
+  ],
+  "verification": [
+    "cd 1-kickbadguy/server && npm install",
+    "cd 1-kickbadguy/server && node --check room-server.js",
+    "cd 1-kickbadguy/server && npm test"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

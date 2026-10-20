@@ -1,0 +1,62 @@
+{
+  "verdict": "APPROVED",
+  "reviewDoc": "/Users/zhangji1641/codebase/kiro-idea/1-kickbadguy/.kiro/specs/kick-bad-guy/design-review.md",
+  "summary": "design.md v2 对首轮 2 HIGH + 5 MEDIUM + 6 NIT 共 13 条逐条实质闭合，经独立复核确实修复。本轮新发现 3 条均为 NIT。七个重点维度（协议完整性/状态机自洽/音频三级回退/canvas 分享图/三语 BCP-47 码/合规三红线/配音 B 方案）均可落地。0 HIGH + 0 MEDIUM，裁决 APPROVED。",
+  "counts": {
+    "high": 0,
+    "medium": 0,
+    "nit": 3
+  },
+  "priorReview": {
+    "verdict": "CHANGES_REQUESTED",
+    "counts": {
+      "high": 2,
+      "medium": 5,
+      "nit": 6
+    },
+    "allClosed": true,
+    "note": "首轮 13 条 findings 本版全部真实闭合，无名义修复/实质悬置的情况。"
+  },
+  "findings": [
+    {
+      "id": 1,
+      "severity": "NIT",
+      "title": "§4.1 首帧契约「回 BAD_PAYLOAD 并忽略」措辞与 §4.5「BAD_PAYLOAD 不下发 error 帧」字面张力",
+      "location": "§4.1 首帧契约 vs §4.5 BAD_PAYLOAD 行",
+      "fix": "把 §4.1「一律回 BAD_PAYLOAD 并忽略」改为「一律按 BAD_PAYLOAD 归类并忽略（不下发 error 帧，仅 console.debug，与 §4.5 一致）」。纯措辞对齐，不改逻辑。"
+    },
+    {
+      "id": 2,
+      "severity": "NIT",
+      "title": "snapshot 在统一信封中的层级（data.snapshot vs data=snapshot）未在 §4.3 示例标明",
+      "location": "§4 统一信封 vs §4.2 room_state 的 data={snapshot} vs §4.3 裸 snapshot 示例",
+      "fix": "在 §4.3 开头加一句：snapshot 始终作为所在帧 data.snapshot 的值（room_state 为 data:{snapshot:{…}}，room_created/room_joined 为 data:{roomCode,role,snapshot:{…}}），消除裸对象示例的层级歧义。"
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "title": "burning→fortune 两次 phase 切换的广播帧数与「phase 变更一律随 room_state 广播」规则交互未写死",
+      "location": "§3 burning 段 + §4.2 burn/fortune 为纯增量帧 + §3「snapshot.phase 为唯一路由依据」",
+      "fix": "§4.4 规则 3 写死二选一：方案A（推荐）burn/fortune 帧本身带 phase 字段供前端这两帧例外路由；或方案B 每次 phase 变更各随一帧 room_state。明确选定其一，避免实现者各自理解切屏信号。"
+    }
+  ],
+  "verifiedAssumptions": [
+    "三语咒语文案在 00/requirements/design 三处 grep 比对逐字节一致，无漂移",
+    "zh-CN/zh-HK/en-US 为合法 BCP-47 标签，与 SpeechSynthesisUtterance.lang、spell-<lang>.mp3 命名、AUDIO_MANIFEST 键自洽；设计正确承认浏览器多无粤语嗓音属可接受降级",
+    "配音 B 方案严格落地：运行路径不调用 ElevenLabs，脚本本次不运行、key 仅来自 env、未设置即 exit(1) 不写占位，.gitignore 忽略 .env 与 mp3，.env.example 仅含变量名",
+    "WebSocket 协议完整可实现：C2S/S2C 消息类型、data 字段、允许 phase、广播/单播规则、Room 内存状态形状均定义；后端单一事实源、不收客户端计数、applyHit 封顶 88、Node 单线程串行化并发 hit",
+    "房间状态机自洽：altar→chanting→beating→burning→fortune 单向推进，非法转移静默回 room_state 自愈，phase 变更随 room_state 广播、前端以 snapshot.phase 路由",
+    "音频 mp3→Web Speech→文字三级回退明确；mp3 存在性用静态 AUDIO_MANIFEST 清单，理由充分",
+    "canvas 分享图可落地：750x1334 离屏 canvas、七层绘制、toBlob 导出 PNG、canShare→share→a[download]→长按 判定顺序、系统字体栈",
+    "ws 裸 server 监听形态成立：new WebSocketServer({host,port}) 为库支持用法，内部自建 HTTP server 接受任意路径升级，与 §5 描述一致",
+    "合规三红线均有设计落点：真名拦截（姓氏表+称谓+随机花名逃生口）、化灰唯祥云消散无血腥、页脚声明+民俗定位+鹅颈桥背景+分享图小字；Web Speech 只读固定咒语不读花名",
+    "终态与幂等正确：fortune 后端只抽一次锁定重连返回同值；burning 后忽略 hit、封顶 88 幂等",
+    "app/server/scripts/assets 目前无代码，属 design 阶段完成、实现未开始的必然状态，不作为缺陷"
+  ],
+  "unverifiedOrWrongAssumptions": [
+    "【未验证·已设计层缓解】navigator.canShare/navigator.share({files}) 在 iOS Safari/Android WebView 的文件分享可用性本环境无法实测；§11 三级兜底到「长按保存」使风险可控，实现后需真机验证至少一条路径可用",
+    "【未验证·已设计层缓解】浏览器 zh-HK 粤语嗓音存在性因浏览器而异；§8 已加同屏显示粤语原文补偿，属可接受 MVP 局限",
+    "【未验证·环境依赖】线上 WebSocket 可达性依赖把房间服务部署到支持 ws 升级的运行环境并由前端 WS_URL 直连其公网地址；设计已正确排除纯 OSS 反代的不成立前提，实际部署目标（wss/证书/公网可达）需部署阶段确认，非设计缺陷",
+    "【已知 MVP 局限·设计已声明】刷新/重连认领依赖 sessionStorage.clientId 且与 60s cleanupRoom 窗口对齐，关闭标签页或超窗口后重进可能触发 ROOM_FULL；§14 已标注为已知局限、P1 可用持久 clientId 优化"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "project_type": "参赛 MVP：纯静态 H5 竖屏单页（零构建）前端 + 单文件 Node WebSocket 内存房间后端 + Node 预生成脚本。文档放在 1-kickbadguy/，Kiro Spec 驱动开发（参赛材料本身）。",
+  "language": "JavaScript (前端原生 ES Module + 零构建；后端 Node ESM)",
+  "build_system": "无前端构建步骤——纯 HTML/CSS/原生 ES Module JS，用任意静态服务器托管。后端用 npm 安装单一依赖 ws。二维码库 vendored 为 app/vendor/qrcode.min.js（离线 UMD，不走 npm 运行时依赖）。",
+  "test_framework": "Node 原生 node:test + node:assert（无第三方测试框架，符合『轻量』要求）。前端 compliance.js 以纯函数 node:test 单测；canvas/动画走人工 smoke test。",
+  "build_command": "前端无构建；后端：cd server && npm install",
+  "test_command": "后端：cd server && npm test（即 node --test）；前端纯函数：node --test app/js/compliance.test.js",
+  "verification_instructions": "1) 后端：cd server && npm install && npm start（裸 ws 监听 0.0.0.0:8080，PORT 可覆盖）。2) 前端：cd app && python3 -m http.server 5173，浏览器开 http://localhost:5173/。3) 单端走完开坛→邀请→三语念咒(Web Speech/文字兜底)→开打到 88→化灰(祥云，无血腥)→签文→canvas 分享图。4) 双端：两个标签/两角色经邀请链接进房，落鞋/切咒语/化灰/签文实时同步一致；第三连接进房应被 ROOM_FULL 拒；刷新重连经 hello 带 sessionStorage 旧 clientId 在 60s 窗口内认领原槽、状态对齐。5) 脚本：不设 ELEVENLABS_API_KEY 时 node scripts/generate-audio.mjs 打印缺 key 提示并非零退出、不产 mp3、不泄 key。",
+  "snapshot_or_generated_files": "assets/audio/spell-zh-CN.mp3 / spell-zh-HK.mp3 / spell-en-US.mp3 由 scripts/generate-audio.mjs 在设置 ELEVENLABS_API_KEY 后生成；本次不生成、不提交（.gitignore 忽略 assets/audio/*.mp3）。生成后需手动把 app/js/config.js 的 AUDIO_MANIFEST 对应项置 true 才走 mp3 分支。",
+  "environment_constraints": "本机 Node v26（支持 ws、原生 fetch、node:test）。绝不把 ELEVENLABS_API_KEY 硬编码/写占位/提交入库——仅从环境变量读。本次不实际调用 ElevenLabs API、不消费额度、不预生成真实 mp3。前端连接地址与后端监听地址解耦：前端 CONFIG.WS_URL（localStorage 覆盖 > localhost 默认 ws://localhost:8080 > 线上占位 wss://REPLACE_WITH_ROOM_SERVER_HOST），后端 PORT。线上需支持 WebSocket 的运行环境（容器/VM），非纯 OSS。",
+  "contribution_requirements": "无项目级 AGENTS.md/CONTRIBUTING。约束来自已批准的 .kiro/specs/kick-bad-guy/{requirements.md,design.md}（design-review 裁决 APPROVED）与 .kiro/steering/{民俗合规.md,视觉风格.md}（本任务产出，每轮实现须遵守）。锁定决策不可更改：H5 竖屏单页 / WebSocket 双角色实时房 / 配音 B 方案 / ws 单文件内存房间 / 港式霓虹纸扎风。",
+  "key_patterns": "后端单一事实源：所有改变共享进度的动作（落鞋/切咒语/化灰/抽签/进出房）只经后端改内存并广播 room_state；前端不自行推进共享进度。首帧契约：每条连接必须先发 hello→收 hello_ok{clientId} 后方可发业务消息。落鞋高频路径只发 hit 增量帧（{hits,villainStage,by}），room_state 仅在进房/重连/phase 变更/切咒语下发；前端对 hits 取 Math.max 单调递增防回退。phase 变更一律随 room_state 广播，前端以 snapshot.phase 为唯一界面路由依据。错误码：ROOM_NOT_FOUND/ROOM_FULL 下发 error 帧并面向用户提示；BAD_PAYLOAD/PHASE_REJECTED 静默回快照不断连。房满 = 已认领 clientId 落鞋成员数达 2（重连带旧 clientId 不占新槽）。签文后端抽一次锁定、幂等。小人四阶段阈值：0–21 嚣张/22–43 懵逼/44–87 冒烟/88 化灰。弹跳动画单实例 retrigger 重置相位。音频三级回退：mp3 优先→Web Speech(zh-CN/zh-HK/en-US)→文字兜底；zh-HK 走 Web Speech 时同屏显示粤语原文；音频须用户手势触发。分享/保存判定顺序：navigator.canShare({files})→a[download]→提示长按。合规：花名启发式拦截(2–4 纯汉字且首字命中约 100 常见姓氏表、姓+称谓；整活花名放行；一键随机花名逃生口)、仅卡通纸片人 + 祥云化灰无血腥、页脚『本应用为民俗文化体验与解压娱乐』+ 民俗定位标注、分享图保留合规小字。",
+  "relevant_files": [
+    "1-kickbadguy/.kiro/specs/kick-bad-guy/requirements.md (权威需求 EARS)",
+    "1-kickbadguy/.kiro/specs/kick-bad-guy/design.md (权威设计，含协议 §4/后端 §5/小人 §6/文案库 §7/音频 §8/视觉 §9/合规 §10/分享图 §11/脚本 §12/配置 §13/边界 §14/可测 §15/目录 §16)",
+    "1-kickbadguy/.kiro/specs/kick-bad-guy/tasks.md (有序任务清单，20 项，本分解的回退与参赛材料)",
+    "1-kickbadguy/00-思路与决策.md (一句话卖点、玩法、决策、咒语文案、Kiro 使用分策略)",
+    "1-kickbadguy/.kiro/specs/kick-bad-guy/design-review.json (裁决 APPROVED)"
+  ],
+  "directory_structure": "1-kickbadguy/：00-思路与决策.md、README.md(产出)、.env.example(产出)、.gitignore(产出)；.kiro/specs/kick-bad-guy/{requirements.md,design.md,tasks.md,design-review.*,task-kick-bad-guy/*}；.kiro/steering/{民俗合规.md,视觉风格.md}(产出)；app/{index.html,css/theme.css,js/{main,config,ws-client,store,audio,villain,share-card,compliance}.js,js/screens/{altar,invite,spell,beat,ash,fortune}.js,vendor/qrcode.min.js}；server/{room-server.js,package.json,*.test.js}；scripts/generate-audio.mjs；assets/audio/{.gitkeep,README.md}。"
+}

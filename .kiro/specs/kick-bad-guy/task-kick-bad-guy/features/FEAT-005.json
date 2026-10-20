@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-005",
+  "type": "docs",
+  "description": "参赛 README（一句话卖点 + 玩法 + 本地运行确切命令 + 技术架构 + 合规说明 + 约 200 字 Kiro 能力说明指向 .kiro/）与端到端运行时集成验证（单端全流程、双端实时同步、清理）。对应 tasks.md 第 17–20 项。依赖 FEAT-002/003/004 全部完成（README 要写确切运行命令、验证要跑真实前后端）。",
+  "status": "pending",
+  "steps": [
+    "编写 1-kickbadguy/README.md：一句话卖点(引自 00-思路与决策.md)；玩法介绍(开坛→请神婆→三语念咒→抄鞋开打→化灰→转运签)；本地运行确切命令两部分——后端 `cd server && npm install && npm start`(监听 8080，PORT 可覆盖)，前端 `cd app && python3 -m http.server 5173` 后开 http://localhost:5173/（线上改 config.js 的 WS_URL 或 localStorage.setItem('WS_URL',…)）；技术架构(纯静态 H5 + 单文件 ws 内存房间 + Web Speech/mp3 回退 + canvas 分享图 + WebSocket 同步)；合规说明(花名拦截/无血腥/民俗定位三红线)；约 200 字段落明确写出『本项目全程用 Kiro 的 Spec / Steering / Hooks 能力完成』并指向 .kiro/(specs 三文档 requirements/design/tasks + steering 两文档民俗合规/视觉风格 + hook)。",
+    "单端全流程验证：起 cd server && npm start 与 cd app && python3 -m http.server 5173，浏览器走完开坛→邀请→念咒(Web Speech/文字兜底)→开打到 88→化灰(祥云无血腥)→签文→生成分享图；确认页脚与分享图合规声明在位、无控制台未捕获错误。发现缺陷记录到 findings 并回对应 feature(FEAT-003/002)修复后复验。",
+    "双端实时同步验证：两标签/两角色经邀请链接进房，一方落鞋/切咒语/化灰/出签另一方实时同步一致；验证第三连接进房被 ROOM_FULL 拒、断线刷新重连经 hello 带 sessionStorage 旧 clientId 在 60s 窗口内认领原槽并状态对齐。",
+    "清理：删除验证产生的临时文件/日志；确认未生成/未提交任何 mp3 与 .env、.gitignore 生效；确认 .kiro/specs/kick-bad-guy/ 三文档与 .kiro/steering/ 两文档齐全。"
+  ],
+  "acceptance_criteria": [
+    "README.md 含一句话卖点、两段本地运行命令(后端 + 前端)、技术架构、合规说明、约 200 字 Kiro 能力段并指向 .kiro/ 目录。",
+    "单端全流程走通并生成分享图，合规声明在位、无血腥、无控制台未捕获错误。",
+    "双端 hits/咒语/化灰/签文实时一致；第三者进房提示房间已满；刷新重连状态对齐。",
+    "git status 无意外临时产物；ls assets/audio 仅含 .gitkeep 与 README.md（无 mp3）；specs 三文档与 steering 两文档齐全。"
+  ],
+  "verification": [
+    "cat 1-kickbadguy/README.md （核对六项要素齐全）",
+    "cd 1-kickbadguy/server && npm start （后台）+ cd 1-kickbadguy/app && python3 -m http.server 5173，浏览器手测单端全流程与双标签实时同步",
+    "cd 1-kickbadguy && git status --short && ls assets/audio"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

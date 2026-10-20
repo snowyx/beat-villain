@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "仓库骨架 + 密钥卫生文件 + Kiro Steering（民俗合规 + 视觉风格）。对应 tasks.md 第 1–3 项、design §16/§9/§10。无依赖，须最先完成——后续 feature 的实现要遵守这两份 steering，且目录骨架是其落点。独立于其它 feature。",
+  "status": "completed",
+  "steps": [
+    "创建目录骨架：app/css、app/js/screens、app/vendor、server、scripts、assets/audio；创建 assets/audio/.gitkeep。",
+    "创建 1-kickbadguy/.env.example：仅一行 `ELEVENLABS_API_KEY=`（无值）。",
+    "创建 1-kickbadguy/.gitignore：忽略 .env、node_modules/、assets/audio/*.mp3、.DS_Store。",
+    "编写 .kiro/steering/民俗合规.md：依 design §10 与 requirements 11/12/13，四节——花名真实姓名拦截（2–4 纯汉字且首字命中约 100 常见姓氏表、姓+称谓结尾判疑似；整活花名放行；一键随机花名逃生口）、无血腥（仅卡通纸片人 + 祥云消散、朱砂红不用于血）、民俗定位标注（粤港澳民间习俗、惊蛰鹅颈桥、民俗数字化体验）、页脚声明『本应用为民俗文化体验与解压娱乐』与音频不含真实个人信息；文首写明『供每轮实现自动遵守』。",
+    "编写 .kiro/steering/视觉风格.md：依 design §9——配色变量(--zhu-sha-red:#E23A3A/--liu-jin-gold:#F4C430/--neon-purple:#A24BFF/--ink:#140A1F)、霓虹辉光 text/box-shadow 做法、港式招牌楷体栈、375px 竖屏小程序骨相、纸扎/香烛 Emoji+canvas 元素、响应式与横屏提示；文首写明『供每轮实现自动遵守』。"
+  ],
+  "acceptance_criteria": [
+    "`ls -R 1-kickbadguy/app 1-kickbadguy/server 1-kickbadguy/scripts 1-kickbadguy/assets` 显示目录齐全，含 assets/audio/.gitkeep。",
+    ".env.example 不含任何 key 值；.gitignore 含 .env、node_modules/、assets/audio/*.mp3、.DS_Store 四项。",
+    ".kiro/steering/民俗合规.md 含花名拦截/无血腥/民俗定位/页脚声明四节，与 requirements 11/12/13 可对应。",
+    ".kiro/steering/视觉风格.md 含上述四个配色十六进制值与 375px 骨相约定，与 design §9 一致。"
+  ],
+  "verification": [
+    "cd 1-kickbadguy && ls -R app server scripts assets",
+    "cat 1-kickbadguy/.gitignore && cat 1-kickbadguy/.env.example",
+    "确认 .kiro/steering/ 下两份 md 存在且含要求的小节与配色值"
+  ],
+  "blocked_reason": null,
+  "findings": "骨架已就位。目录: app/{css,js/screens,vendor}、server、scripts、assets/audio(含 .gitkeep)。密钥卫生: 1-kickbadguy/.env.example 仅一行 `ELEVENLABS_API_KEY=`(无值); .gitignore 忽略 .env、node_modules/、assets/audio/*.mp3、.DS_Store(mp3 与 .env 永不入库)。Steering 两份已写并带 `inclusion: always` front matter，后续每轮实现会自动加载: .kiro/steering/民俗合规.md(花名拦截两规则+约100姓氏表+一键随机花名逃生口; 仅卡通纸片人+祥云化灰无血腥+朱砂红不作血; 粤港澳民俗/民俗数字化体验标注; 页脚『本应用为民俗文化体验与解压娱乐』+音频不读花名)与 .kiro/steering/视觉风格.md(锁定配色变量 --zhu-sha-red:#E23A3A/--liu-jin-gold:#F4C430/--neon-purple:#A24BFF/--ink:#140A1F; 霓虹 text/box-shadow; 系统楷体栈; 375px 竖屏小程序骨相 max-width:375px+100dvh+底部 tab 感; Emoji+canvas 纸扎元素; 横屏轻提示)。git 已在 1-kickbadguy/ 初始化(本目录为仓库根,非上级工作区)。后续 FEAT 落点: 前端 app/js/{main,config,ws-client,store,audio,villain,share-card,compliance}.js 与 app/js/screens/{altar,invite,spell,beat,ash,fortune}.js、app/vendor/qrcode.min.js; 后端 server/room-server.js+package.json(仅 ws); 脚本 scripts/generate-audio.mjs。本 FEAT 不产 README/.env/app/server/scripts/assets 下的实现代码——那些归后续 FEAT。验证命令全通过(ls -R/cat/steering 小节与配色值核对)。"
+}

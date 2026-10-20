@@ -1,0 +1,22 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "ElevenLabs 三语咒语预生成脚本 scripts/generate-audio.mjs（本次不运行、key 不入库）+ assets/audio/README.md 占位说明。对应 tasks.md 第 15–16 项、design §12、requirements 8。依赖 FEAT-001（scripts/ 与 assets/audio/ 目录）。独立于 FEAT-002/003。",
+  "status": "pending",
+  "steps": [
+    "scripts/generate-audio.mjs（Node ESM，本次不运行）：仅从 process.env.ELEVENLABS_API_KEY 读 key，未设置则 console.error 提示『请先 export ELEVENLABS_API_KEY=... 再运行』并 process.exit(1)，绝不硬编码/写占位 key；内置与 requirements 3.2 一致的三语 SPELL_TEXT(注释标注须与 requirements 同步)；对 zh-CN/zh-HK/en-US 各调一次 ElevenLabs TTS(Node18+ 内置 fetch，voiceId 从环境变量/脚本顶部常量配置且非密钥)，写 assets/audio/spell-<lang>.mp3；每请求 try/catch、HTTP 非 2xx 打印状态码与响应摘要并跳过该语言、汇总成功/失败数、401/403 明确提示检查 key；写文件失败打印路径与错误；日志仅打印『已读取 key(已隐藏)』不打印完整 key；文末注释说明生成成功后把 app/js/config.js 的 AUDIO_MANIFEST 对应项置 true。",
+    "assets/audio/README.md：说明存放 spell-zh-CN.mp3/spell-zh-HK.mp3/spell-en-US.mp3(命名同 requirements 8.6)；本次缺省为空→运行时 Web Speech 回退；由 scripts/generate-audio.mjs 在设置 ELEVENLABS_API_KEY 后生成；生成后手动把 config.js AUDIO_MANIFEST 对应项置 true。"
+  ],
+  "acceptance_criteria": [
+    "不设置环境变量时 node scripts/generate-audio.mjs 打印缺 key 提示并以非零码退出，不产生任何 mp3、不泄露 key。",
+    "脚本中无任何硬编码/占位 API key；key 仅来自 process.env.ELEVENLABS_API_KEY。",
+    "assets/audio/README.md 存在，mp3 命名与前端 AUDIO_MANIFEST/脚本输出一致。"
+  ],
+  "verification": [
+    "cd 1-kickbadguy && unset ELEVENLABS_API_KEY; node scripts/generate-audio.mjs; echo \"exit=$?\"",
+    "cd 1-kickbadguy && ls assets/audio （确认无 mp3 生成，仅 .gitkeep 与 README.md）",
+    "grep -i 'sk-\\|api_key\\|apikey' scripts/generate-audio.mjs 确认无硬编码 key 值"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

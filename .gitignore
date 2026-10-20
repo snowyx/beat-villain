@@ -1,0 +1,11 @@
+# 密钥：绝不入库
+.env
+
+# Node 依赖
+node_modules/
+
+# 预生成音频：由 scripts/generate-audio.mjs 本地生成，不提交
+assets/audio/*.mp3
+
+# macOS
+.DS_Store
