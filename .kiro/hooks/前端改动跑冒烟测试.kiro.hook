@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "前端改动跑冒烟测试",
+  "description": "保存前端源码（app/js 下的 JS）时，自动跑合规纯函数单测与后端房间服务单测，作为本地冒烟校验。依据 00-思路与决策.md 第五节『Hooks』与 design §15 可测性。",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "1-kickbadguy/app/js/**/*.js"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "前端源码刚被保存。请在 1-kickbadguy/ 下跑本地冒烟测试并汇报结果：1) 前端合规纯函数单测 `node --test app/js/compliance.test.js`；2) 后端房间服务单测 `cd server && npm test`。任一失败时，指出失败用例与最可能的成因，不要自动改代码。全部通过时回一句『冒烟通过』即可。"
+  }
+}
