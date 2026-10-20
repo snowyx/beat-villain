@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "前端 H5 竖屏单页完整玩法循环 + 港式霓虹纸扎风 + WebSocket 客户端同步 + 三级音频回退 + canvas 小人 + canvas 分享图 + 合规拦截。对应 tasks.md 第 8–14 项、design §2/§6/§8/§9/§10/§11/§13。依赖 FEAT-002（后端协议对端可联调）与 FEAT-001（app/ 目录与 steering）。这是最大一块，步骤多但为一个连贯可运行单元。",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "搭容器与配置：app/index.html（375px 竖屏骨相、同页六流程态容器 altar/invite/spell/beat/ash/fortune、页脚合规声明、ES Module 引入 js/main.js 与 vendor/qrcode.min.js）；app/js/config.js（WS_URL 按 design §13：localStorage 覆盖 > localhost 默认 ws://localhost:8080 > 线上占位 wss://REPLACE_WITH_ROOM_SERVER_HOST；TARGET_HITS:88；AUDIO_MANIFEST 三者 false）；vendored app/vendor/qrcode.min.js（轻量 UMD 二维码库，离线可用，不走 npm 运行时依赖）。",
     "app/css/theme.css：依 steering 视觉风格与 design §9——配色 CSS 变量、霓虹辉光 text/box-shadow、港式招牌楷体栈、375px 居中骨相 + 底部操作条、金边纸纹卡片、节制的辉光呼吸动画、横屏轻提示。",
@@ -26,5 +26,5 @@
     "浏览器控制台确认无未捕获异常、首页/分享图合规声明在位"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "前端 H5 全量交付并已端到端验证通过。文件清单：app/index.html（六流程态容器 altar/invite/spell/beat/ash/fortune + 页脚合规声明 + 内联🧧favicon 消除 404）、app/css/theme.css（四色变量锁定 #E23A3A/#F4C430/#A24BFF/#140A1F、霓虹多层 text/box-shadow、楷体栈、375px 骨相 + 底部操作条、横屏轻提示）、app/vendor/qrcode.min.js（自带离线 UMD 二维码，字节模式，RS/BCH/掩码完整，window.qrcode + qr.renderTo(canvas)）、app/js/{config,ws-client,store,audio,villain,share-card,compliance,main}.js + screens/{altar,invite,spell,beat,ash,fortune}.js + compliance.test.js。\n\n验证结果：(1) node --test app/js/compliance.test.js 全绿（8 suites，真名张三/王小明/李先生/欧阳娜/诸葛明拦截，整活花名甩锅侠/卷王本卷/隔壁组某人放行，randomFlower 200 次必放行）。(2) Playwright 真浏览器全流程走通：开坛（张三被拦→🎲随机花名放行）→邀请（房间码+QR canvas 175×175 实绘 11525 暗像素+复制链接）→念咒（zh-CN/zh-HK 咒语文案与 requirements 3.2 逐字一致、切语言同步）→开打（villain canvas 实时绘制 46万非空像素，88 鞋）→化灰（共抽 88 鞋，祥云无血腥）→签文（宜/忌/贵人）→分享图（drawShareCard 产 750×1334 image/png 864KB，页脚合规小字区 11517 lit 像素）。全程控制台 0 error。(3) Node ws 双端联调（见既有 server 测试路径同源）：create→join→set_lang 同步→start_beat→88 鞋→burn 双端收到→fortune 两端完全一致（锁定幂等）→第三连接 ROOM_FULL。\n\n协议对齐要点（供排障）：后端 burn/fortune 为增量帧、不随 room_state 下发，故前端在 burn 帧合并权威 hits=88、在 fortune 帧本地置 phase（beating→burning），ash 屏化灰动画 2.6s 后本地推进 phase→fortune 再路由（screens/ash.js + main.js 的 burn/fortune handler）。hits 全程 Math.max 单调递增防回退。sessionStorage 存 clientId（key kbg_client_id）支撑刷新重连认领原槽——联调换房前需 sessionStorage.clear()。\n\n运行方式：后端 cd server && npm start（默认 ws://0.0.0.0:8080，PORT 可覆盖）；前端 cd app && python3 -m http.server 5173 打开 http://localhost:5173/。前端 WS_URL 默认连 localhost:8080，线上改 config.js 的 REPLACE_WITH_ROOM_SERVER_HOST 或 localStorage.setItem('WS_URL',…)。mp3 未生成（AUDIO_MANIFEST 三者 false），运行时走 Web Speech/文字兜底，符合配音 B 方案。\n\n后续（README/收尾步骤）可直接引用：本 FEAT 已补全 design §16 目录中 app/ 全部文件；QR 库已 vendored 无 npm 运行时依赖；静态前端零构建，任意静态托管可部署。"
 }

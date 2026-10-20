@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#140A1F" />
+  <title>赛博打小人 · Cyber Beat the Villain</title>
+  <!-- 内联 favicon（🧧），避免 favicon.ico 404 噪声；纯静态、无外部请求 -->
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%A7%A7%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/theme.css" />
+</head>
+
+<body>
+  <!-- 横屏轻提示（不阻断） -->
+  <div id="landscape-tip" class="landscape-tip">📱 建议竖屏体验</div>
+
+  <main id="app" class="phone-frame">
+    <header class="app-header">
+      <span class="brand neon-title-sm">赛博打小人</span>
+    </header>
+
+    <!-- 同页六流程态容器 -->
+    <section id="screen-altar" class="screen active"></section>
+    <section id="screen-invite" class="screen"></section>
+    <section id="screen-spell" class="screen"></section>
+    <section id="screen-beat" class="screen"></section>
+    <section id="screen-ash" class="screen"></section>
+    <section id="screen-fortune" class="screen"></section>
+
+    <footer class="app-footer">
+      <p class="compliance">本应用为民俗文化体验与解压娱乐</p>
+      <p class="compliance-sub">「打小人」为粤港澳民间习俗（惊蛰日鹅颈桥下最盛）· 本作品为其民俗数字化体验</p>
+    </footer>
+  </main>
+
+  <!-- 离线二维码库（UMD，挂到 window.qrcode） -->
+  <script src="vendor/qrcode.min.js"></script>
+  <!-- 入口（原生 ES Module） -->
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

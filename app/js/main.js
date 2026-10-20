@@ -1,0 +1,243 @@
+// 入口（design §3 phase 路由 / §4 协议装配 / §13 hash 路由）。
+// location.hash 路由（检测 #/join?room= 自动带入房间码）；
+// 按 snapshot.phase 唯一路由切屏；装配 ws/store/各 screen。
+
+import { WsClient } from './ws-client.js';
+import { Store } from './store.js';
+import { unlockAudio } from './audio.js';
+
+import { initAltar } from './screens/altar.js';
+import { initInvite } from './screens/invite.js';
+import { initSpell, teardownSpell } from './screens/spell.js';
+import { initBeat, teardownBeat } from './screens/beat.js';
+import { initAsh, teardownAsh } from './screens/ash.js';
+import { initFortune } from './screens/fortune.js';
+
+const SCREENS = ['altar', 'invite', 'spell', 'beat', 'ash', 'fortune'];
+
+const app = {
+  ws: new WsClient(),
+  store: new Store(),
+  pendingJoinRoom: null,
+  current: null, // 当前屏 key
+  _hitFrameHandlers: new Set(),
+  _villainStateHandlers: new Set(),
+
+  audioUnlock() {
+    unlockAudio();
+  },
+
+  onHitFrame(fn) {
+    this._hitFrameHandlers.add(fn);
+    return () => this._hitFrameHandlers.delete(fn);
+  },
+  onVillainStateFrame(fn) {
+    this._villainStateHandlers.add(fn);
+    return () => this._villainStateHandlers.delete(fn);
+  },
+
+  route() {
+    renderRoute(this);
+  },
+};
+
+// ── hash 路由：检测 #/join?room=CODE ──
+function parseJoinRoom() {
+  const hash = location.hash || '';
+  const m = hash.match(/#\/join\?room=([A-Z0-9]+)/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+// ── 把 phase 映射到屏 key（snapshot.phase 为唯一路由依据）──
+function screenForState(state) {
+  // 神婆待进房（有 pendingJoinRoom 且本端尚无房间）→ invite（进房确认）
+  if (app.pendingJoinRoom && !state.roomCode) return 'invite';
+  switch (state.phase) {
+    case 'altar':
+      return 'invite'; // 建房后进入邀请屏
+    case 'chanting':
+      return 'spell';
+    case 'beating':
+      return 'beat';
+    case 'burning':
+      return 'ash';
+    case 'fortune':
+      return 'fortune';
+    default:
+      return 'altar'; // 尚无房间：开坛
+  }
+}
+
+function showOnly(key) {
+  for (const k of SCREENS) {
+    const node = document.getElementById(`screen-${k}`);
+    if (node) node.classList.toggle('active', k === key);
+  }
+}
+
+function teardownCurrent() {
+  switch (app.current) {
+    case 'spell': teardownSpell(app); break;
+    case 'beat': teardownBeat(app); break;
+    case 'ash': teardownAsh(app); break;
+    default: break;
+  }
+}
+
+function renderRoute(appRef = app) {
+  const state = appRef.store.state;
+  const key = screenForState(state);
+  const el = document.getElementById(`screen-${key}`);
+  if (!el) return;
+
+  // 若目标屏未变且已挂载，避免 ash/beat 等重复重建
+  if (appRef.current === key && el.dataset.mounted === '1') {
+    return;
+  }
+
+  teardownCurrent();
+  appRef.el = el;
+
+  switch (key) {
+    case 'altar': initAltar(appRef); break;
+    case 'invite': initInvite(appRef); break;
+    case 'spell': initSpell(appRef); break;
+    case 'beat': initBeat(appRef); break;
+    case 'ash': initAsh(appRef); break;
+    case 'fortune': initFortune(appRef); break;
+  }
+
+  // 标记挂载态（供下次比较）
+  for (const k of SCREENS) {
+    const n = document.getElementById(`screen-${k}`);
+    if (n) n.dataset.mounted = k === key ? '1' : '0';
+  }
+  appRef.current = key;
+  showOnly(key);
+}
+
+// ── ws 事件装配 ──
+function wireWs() {
+  const { ws, store } = app;
+
+  ws.on('room_created', (d) => {
+    store.applySnapshot(d.snapshot, { role: d.role });
+    app.pendingJoinRoom = null;
+    renderRoute();
+  });
+
+  ws.on('room_joined', (d) => {
+    store.applySnapshot(d.snapshot, { role: d.role });
+    app.pendingJoinRoom = null;
+    renderRoute();
+  });
+
+  ws.on('room_state', (d) => {
+    store.applySnapshot(d.snapshot);
+    renderRoute();
+  });
+
+  ws.on('member_change', (d) => {
+    store.setMembers(d.members);
+    renderRoute();
+  });
+
+  ws.on('hit', (d) => {
+    store.applyHit(d);
+    for (const fn of app._hitFrameHandlers) {
+      try { fn(d); } catch (e) { console.error(e); }
+    }
+  });
+
+  ws.on('villain_state', (d) => {
+    store.applyVillainState(d);
+    for (const fn of app._villainStateHandlers) {
+      try { fn(d); } catch (e) { console.error(e); }
+    }
+  });
+
+  ws.on('burn', (d) => {
+    // burn 帧带权威 hits=88：合并进 store（Math.max 单调递增）确保化灰显示 88 鞋。
+    if (d && typeof d.hits === 'number') store.applyHit({ hits: d.hits, villainStage: '化灰' });
+    store.setBurned();
+    // phase→burning/fortune 会随后续 room_state 路由；burn 增量帧本身不改 phase，
+    // 但 ash 屏依赖 burned 标志呈现，这里确保切到 ash。
+    if (store.state.phase === 'beating') {
+      store.state.phase = 'burning';
+    }
+    renderRoute();
+  });
+
+  ws.on('fortune', (d) => {
+    store.applyFortune(d);
+    // fortune 为增量帧、不随 room_state 下发；据协议到达 fortune 即仪式进入签文态。
+    // 先置 phase=burning（若还没），让 ash 屏的化灰动画播完后由其定时器切到 fortune。
+    if (store.state.phase === 'beating') store.state.phase = 'burning';
+    store._fortuneReady = true;
+    renderRoute();
+  });
+
+  ws.on('error', (d) => {
+    handleError(d);
+  });
+
+  ws.on('_disconnected', () => {
+    store.setConnected(false);
+  });
+
+  // 连接成功（hello_ok）后标记已连接
+  ws.on('hello_ok', () => {
+    store.setConnected(true);
+  });
+}
+
+function handleError(d) {
+  const code = d && d.code;
+  // 只有 ROOM_NOT_FOUND / ROOM_FULL 面向用户提示（design §4.5）
+  if (code === 'ROOM_NOT_FOUND' || code === 'ROOM_FULL') {
+    const msg = code === 'ROOM_NOT_FOUND' ? '房间不存在或已散场' : '房间已满，这坛不缺人~';
+    showToast(msg);
+    // 神婆停留在进房界面
+    const btn = document.querySelector('#confirm-join');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function showToast(text) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+// ── 启动 ──
+function boot() {
+  wireWs();
+
+  // 首个用户手势解锁音频
+  const unlockOnce = () => {
+    unlockAudio();
+    window.removeEventListener('pointerdown', unlockOnce);
+  };
+  window.addEventListener('pointerdown', unlockOnce);
+
+  // hash 路由：神婆邀请链接
+  app.pendingJoinRoom = parseJoinRoom();
+
+  app.ws.connect();
+  renderRoute(); // 初始渲染（altar 或 神婆进房确认）
+
+  window.addEventListener('hashchange', () => {
+    app.pendingJoinRoom = parseJoinRoom();
+    if (app.pendingJoinRoom && !app.store.state.roomCode) renderRoute();
+  });
+}
+
+boot();
