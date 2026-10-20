@@ -1,7 +1,13 @@
 {
   "task_id": "task-kick-bad-guy",
   "task_description": "实现参赛 MVP「赛博打小人」：H5 竖屏单页（纯静态零构建）完整玩法循环（开坛立牌→请神婆→三语念咒→抄鞋开打→小人化灰→转运签文）+ 港式霓虹纸扎风 + Web Speech 三语发声含 mp3 回退 + canvas 分享图 + WebSocket 客户端同步；单文件 Node ws 内存房间服务；ElevenLabs 三语咒语预生成脚本（本次不运行、key 不入库）；assets/audio 占位；Kiro steering（民俗合规 + 视觉风格）；参赛 README（含约 200 字 Kiro 能力说明）。tasks.md 已作为权威清单与本分解的回退存在。",
-  "status": "pending",
-  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "status": "completed",
+  "feature_order": [
+    "FEAT-001",
+    "FEAT-002",
+    "FEAT-003",
+    "FEAT-004",
+    "FEAT-005"
+  ],
   "blocked_reason": null
 }
