@@ -1,0 +1,199 @@
+// 后端集成测试（node:test + 真实 ws 客户端），依据 design §15 / FEAT-002。
+// 两个连接走：hello→建房→进房→切咒语→连打到 88→化灰→签文 全链路，
+// 断言两端 room_state/burn/fortune 一致、hits 封顶 88、断线重连后快照对齐。
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { WebSocket } from 'ws';
+
+import { startServer, TARGET_HITS } from './room-server.js';
+
+// 在随机空闲端口起服务，避免与默认 8080 冲突。
+function startTestServer() {
+  return new Promise((resolve) => {
+    const wss = startServer(0);
+    wss.on('listening', () => resolve({ wss, port: wss.address().port }));
+  });
+}
+
+// 轻量客户端封装：连接、发帧、等待指定 type 的帧。
+class Client {
+  constructor(url) {
+    this.ws = new WebSocket(url);
+    this.queue = [];
+    this.waiters = [];
+    this.opened = new Promise((res, rej) => {
+      this.ws.once('open', res);
+      this.ws.once('error', rej);
+    });
+    this.ws.on('message', (raw) => {
+      const msg = JSON.parse(raw.toString());
+      // 优先交给匹配的等待者
+      const idx = this.waiters.findIndex((w) => w.type === msg.type);
+      if (idx !== -1) {
+        const [w] = this.waiters.splice(idx, 1);
+        w.resolve(msg);
+      } else {
+        this.queue.push(msg);
+      }
+    });
+  }
+
+  send(type, data = {}) {
+    this.ws.send(JSON.stringify({ type, data, ts: Date.now() }));
+  }
+
+  waitFor(type, timeoutMs = 3000) {
+    const queued = this.queue.findIndex((m) => m.type === type);
+    if (queued !== -1) {
+      const [m] = this.queue.splice(queued, 1);
+      return Promise.resolve(m);
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`timeout waiting for ${type}`));
+      }, timeoutMs);
+      this.waiters.push({
+        type,
+        resolve: (m) => {
+          clearTimeout(timer);
+          resolve(m);
+        },
+      });
+    });
+  }
+
+  async hello(clientId) {
+    await this.opened;
+    this.send('hello', clientId ? { clientId } : {});
+    const ok = await this.waitFor('hello_ok');
+    this.clientId = ok.data.clientId;
+    return this.clientId;
+  }
+
+  close() {
+    return new Promise((res) => {
+      this.ws.once('close', res);
+      this.ws.close();
+    });
+  }
+}
+
+function snapOf(msg) {
+  return msg.data.snapshot || msg.data;
+}
+
+test('集成：双客户端全链路 hello→建房→进房→切咒语→打到88→化灰→签文', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const victim = new Client(url);
+  const shaman = new Client(url);
+
+  await victim.hello();
+  await shaman.hello();
+  assert.ok(victim.clientId && shaman.clientId);
+  assert.notEqual(victim.clientId, shaman.clientId);
+
+  // 建房
+  victim.send('create_room', { flower: '卷王本卷', crimes: ['抢功劳', '甩锅侠'] });
+  const created = await victim.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+  assert.equal(created.data.role, 'victim');
+  assert.equal(snapOf(created).phase, 'altar');
+
+  // 神婆进房
+  shaman.send('join_room', { roomCode });
+  const joined = await shaman.waitFor('room_joined');
+  assert.equal(joined.data.role, 'shaman');
+  assert.equal(snapOf(joined).members.length, 2);
+  // 苦主收到 member_change
+  const vMember = await victim.waitFor('member_change');
+  assert.equal(vMember.data.count, 2);
+
+  // 切咒语：全房广播 room_state，两端一致
+  shaman.send('set_lang', { roomCode, lang: 'zh-HK' });
+  const vLang = await victim.waitFor('room_state');
+  const sLang = await shaman.waitFor('room_state');
+  assert.equal(snapOf(vLang).lang, 'zh-HK');
+  assert.equal(snapOf(sLang).lang, 'zh-HK');
+  assert.equal(snapOf(vLang).phase, 'chanting');
+
+  // 开打：phase=beating 随 room_state 广播
+  victim.send('start_beat', { roomCode });
+  const vBeat = await victim.waitFor('room_state');
+  const sBeat = await shaman.waitFor('room_state');
+  assert.equal(snapOf(vBeat).phase, 'beating');
+  assert.equal(snapOf(sBeat).phase, 'beating');
+
+  // 连打到 88：两端各打一部分（后端权威累加）
+  // 监听 burn/fortune（两端都应收到）
+  const vBurn = victim.waitFor('burn');
+  const sBurn = shaman.waitFor('burn');
+  const vFortune = victim.waitFor('fortune');
+  const sFortune = shaman.waitFor('fortune');
+
+  for (let i = 0; i < 50; i++) victim.send('hit', { roomCode });
+  for (let i = 0; i < 50; i++) shaman.send('hit', { roomCode }); // 超打，验证封顶
+
+  const [vb, sb, vf, sf] = await Promise.all([vBurn, sBurn, vFortune, sFortune]);
+  assert.equal(vb.data.hits, TARGET_HITS);
+  assert.equal(sb.data.hits, TARGET_HITS);
+  // 两端签文一致
+  assert.deepEqual(
+    { yi: vf.data.yi, ji: vf.data.ji, guiren: vf.data.guiren },
+    { yi: sf.data.yi, ji: sf.data.ji, guiren: sf.data.guiren },
+  );
+
+  // 断线重连：苦主断开后带旧 clientId 重连，快照对齐（phase=fortune、hits=88、签文同值）
+  const oldClientId = victim.clientId;
+  await victim.close();
+  const reconnected = new Client(url);
+  await reconnected.hello(oldClientId);
+  assert.equal(reconnected.clientId, oldClientId, '重连应认领原 clientId');
+  const aligned = await reconnected.waitFor('room_state');
+  const snap = snapOf(aligned);
+  assert.equal(snap.phase, 'fortune');
+  assert.equal(snap.hits, TARGET_HITS);
+  assert.deepEqual(snap.fortune, { yi: vf.data.yi, ji: vf.data.ji, guiren: vf.data.guiren });
+  // 重连未触发房满（未新增槽），成员仍为 2
+  assert.equal(snap.members.length, 2);
+
+  await shaman.close();
+  await reconnected.close();
+});
+
+test('集成：第三连接进房被 ROOM_FULL 拒；set_lang 对不存在房间回 ROOM_NOT_FOUND', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const a = new Client(url);
+  const b = new Client(url);
+  const c = new Client(url);
+  await a.hello();
+  await b.hello();
+  await c.hello();
+
+  a.send('create_room', { flower: '甩锅侠', crimes: [] });
+  const created = await a.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+
+  b.send('join_room', { roomCode });
+  await b.waitFor('room_joined');
+
+  // 第三连接进房 → ROOM_FULL
+  c.send('join_room', { roomCode });
+  const err = await c.waitFor('error');
+  assert.equal(err.data.code, 'ROOM_FULL');
+
+  // 不存在房间 → ROOM_NOT_FOUND
+  c.send('set_lang', { roomCode: 'ZZZZZZ', lang: 'zh-CN' });
+  const err2 = await c.waitFor('error');
+  assert.equal(err2.data.code, 'ROOM_NOT_FOUND');
+
+  await a.close();
+  await b.close();
+  await c.close();
+});

@@ -1,0 +1,18 @@
+{
+  "name": "kick-bad-guy-room-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "赛博打小人 · 单文件 Node WebSocket 内存房间服务（单一事实源）",
+  "type": "module",
+  "main": "room-server.js",
+  "scripts": {
+    "start": "node room-server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
