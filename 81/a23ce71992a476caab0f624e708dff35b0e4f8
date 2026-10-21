@@ -1,0 +1,14 @@
+app/js/villain.js
+  h_57a4b15c8feaaa 79-80,229-231,234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "81a23ce71992a476caab0f624e708dff35b0e4f8",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
