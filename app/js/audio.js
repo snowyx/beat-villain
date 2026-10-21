@@ -11,7 +11,14 @@ export const SPELL_TEXT = Object.freeze({
   'en-US': "Smack the villain's head, bad luck be gone! Smack the villain's toe, promotions roll on!",
 });
 
-const MP3_PATH = (lang) => `../assets/audio/spell-${lang}.mp3`;
+// 音频与前端同托管在 app/ 下（app/assets/audio/），相对 app 根引用，
+// 便于部署到任意静态平台（Cloudflare Pages 等）随前端一起带上。
+const MP3_PATH = (lang) => `assets/audio/spell-${lang}.mp3`;
+
+// 开打阶段循环 BGM（打小人）：独立 HTMLAudioElement，与 WebAudio SFX 图完全分离，
+// 故 BGM 与 playSmack 永不共享节点、互不打断；loop 自循环，离开开打屏时停并清引用。
+const BEAT_BGM_PATH = 'assets/audio/beat-bgm.mp3';
+let bgmEl = null;
 
 let audioCtx = null;
 let unlocked = false;
@@ -29,6 +36,37 @@ export function unlockAudio() {
   } catch {
     /* 忽略 */
   }
+}
+
+/**
+ * 进入开打屏时循环播放背景音乐（打小人 BGM）。幂等：已在播则直接返回现有元素，
+ * 避免重复挂载导致叠音。volume 默认 0.6（不盖过合成的 playSmack 啪声）。
+ * 吞掉 play() 的 autoplay 拒绝（被浏览器自动播放策略拦截不应抛未捕获错误）。
+ */
+export function startBeatBgm({ volume = 0.6 } = {}) {
+  if (bgmEl) return bgmEl;
+  try {
+    bgmEl = new Audio(BEAT_BGM_PATH);
+    bgmEl.loop = true;
+    bgmEl.volume = volume;
+    bgmEl.play().catch(() => { /* autoplay 被拦截：静默忽略，不抛未捕获错误 */ });
+  } catch {
+    bgmEl = null;
+  }
+  return bgmEl;
+}
+
+/** 离开开打屏时停止 BGM：暂停 + 归零 + 断源 + 丢引用（无泄漏、无叠音）。 */
+export function stopBeatBgm() {
+  if (!bgmEl) return;
+  try {
+    bgmEl.pause();
+    bgmEl.currentTime = 0;
+    bgmEl.src = '';
+  } catch {
+    /* 忽略 */
+  }
+  bgmEl = null;
 }
 
 /**

@@ -3,7 +3,16 @@
 // 本地即时手感（单次弹跳+音效）不本地加计数。
 
 import { Villain } from '../villain.js';
-import { playSmack } from '../audio.js';
+import { playSmack, startBeatBgm, stopBeatBgm } from '../audio.js';
+
+// 开打字幕（粤语打小人经文，逐字锁定，不改一字）。
+const BEAT_SUBTITLES = Object.freeze([
+  '打你个小人头 等你成世 冇出头',
+  '打你个小人手 等你成日 做小偷',
+  '打你个小人脚 等你成世 冇得走',
+  '打你个小人身 等你成世 冇运番',
+]);
+const LINE_MS = 2800; // 每行高亮时长（固定拍，与 BGM 解耦，各自循环）
 
 export function initBeat(app) {
   const el = app.el;
@@ -21,6 +30,10 @@ export function initBeat(app) {
       </div>
 
       <div class="progress"><div id="progress-fill" class="progress-fill"></div></div>
+
+      <div class="beat-subtitles" id="beat-subtitles">
+        ${BEAT_SUBTITLES.map((line) => `<div class="beat-sub-line">${line}</div>`).join('')}
+      </div>
 
       <div class="bottom-bar">
         <button id="hit-btn" class="btn-smack" type="button">👟 抄鞋开打！</button>
@@ -83,6 +96,22 @@ export function initBeat(app) {
   app._beatStoreUnsub = app.store.subscribe(() => renderCount());
 
   renderCount();
+
+  // 背景音乐：进入开打屏循环播放（对齐既有手势解锁机制；autoplay 被拦截已在 helper 内吞掉）。
+  app.audioUnlock();
+  app._beatBgm = startBeatBgm({ volume: 0.6 });
+
+  // 同步滚动字幕：固定拍逐行高亮，循环；与音频是否成功播放无关。
+  const subLines = el.querySelectorAll('.beat-sub-line');
+  let subIdx = 0;
+  function highlight(i) {
+    subLines.forEach((node, idx) => node.classList.toggle('on', idx === i));
+  }
+  highlight(0);
+  app._beatSubtitleTimer = setInterval(() => {
+    subIdx = (subIdx + 1) % subLines.length;
+    highlight(subIdx);
+  }, LINE_MS);
 }
 
 export function teardownBeat(app) {
@@ -91,6 +120,11 @@ export function teardownBeat(app) {
   app._beatStageUnsub?.();
   app._beatStoreUnsub?.();
   app._beatHitUnsub = app._beatStageUnsub = app._beatStoreUnsub = null;
+
+  // 停 BGM（暂停+归零+断源+丢引用）并清字幕定时器——离开开打屏唯一保证钩子，无泄漏/叠音。
+  stopBeatBgm();
+  app._beatBgm = null;
+  if (app._beatSubtitleTimer) { clearInterval(app._beatSubtitleTimer); app._beatSubtitleTimer = null; }
 }
 
 function escapeHtml(str) {
