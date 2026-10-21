@@ -20,7 +20,7 @@ const app = {
   store: new Store(),
   pendingJoinRoom: null,
   current: null, // 当前屏 key
-  _inviteSubview: null, // invite 子视图标记：'shaman-pending' | 'in-room'
+  _inviteSubview: null, // invite 子视图标记：'shaman-pending' | 'shaman-waiting' | 'in-room'
   _hitFrameHandlers: new Set(),
   _villainStateHandlers: new Set(),
 
@@ -85,14 +85,16 @@ function teardownCurrent() {
   }
 }
 
-// invite 屏有两个子视图：神婆进房确认屏（shaman-pending）与在房邀请屏（in-room）。
-// 二者共用 screen key 'invite'，仅靠 initInvite 内 isShamanPending 区分。
-// 进房成功后 key 不变、已挂载，挂载守卫会提前 return 导致停在确认屏——
-// 故需按子视图语义切换强制重渲染一次。
+// invite 屏有三个子视图，共用 screen key 'invite'，仅靠 initInvite 内逻辑区分：
+//   shaman-pending：神婆进房确认屏（有 pendingJoinRoom 且本端尚无房间）；
+//   shaman-waiting：神婆已进房 → 开坛法事等待页（role==='shaman'）；
+//   in-room：苦主在房邀请屏（坛号/二维码/开始念咒）。
+// 子视图切换时 key 不变、已挂载，挂载守卫会提前 return 导致停在旧子视图——
+// 故需按子视图语义切换强制重渲染一次（与 renderRoute 的 subviewChanged 协调）。
 function inviteSubview(appRef) {
-  return appRef.pendingJoinRoom && !appRef.store.state.roomCode
-    ? 'shaman-pending'
-    : 'in-room';
+  if (appRef.pendingJoinRoom && !appRef.store.state.roomCode) return 'shaman-pending';
+  if (appRef.store.state.role === 'shaman') return 'shaman-waiting';
+  return 'in-room';
 }
 
 function renderRoute(appRef = app) {

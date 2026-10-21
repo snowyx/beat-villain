@@ -1,15 +1,21 @@
 // 邀请（design §3 / §4.1 join_room / §13 邀请链接+二维码）。
 // 苦主视角：显示房间码 + 复制邀请链接 + qrcode 二维码 + 「开始念咒」。
-// 神婆视角（#/join?room=）：进房确认 → join_room；ROOM_NOT_FOUND / ROOM_FULL 提示。
+// 神婆视角（#/join?room=）：进房确认 → join_room；进房成功后 → 开坛法事等待页。
+// ROOM_NOT_FOUND / ROOM_FULL 提示由 main.js handleError 处理。
 
 export function initInvite(app) {
   const el = app.el;
   const s = app.store.state;
+  // 神婆待进房：有邀请房间号且本端尚无房间 → 进房确认屏。
   const isShamanPending = app.pendingJoinRoom && !s.roomCode;
 
   if (isShamanPending) {
     renderShamanJoin(app, el);
+  } else if (s.role === 'shaman') {
+    // 已进房神婆 → 开坛法事等待页（不显示二维码/复制邀请链接/开始念咒）。
+    renderShamanWaiting(app, el);
   } else {
+    // role 未定或为苦主 → 兜底走苦主邀请屏，绝不误伤苦主路径。
     renderVictimInvite(app, el);
   }
 }
@@ -98,6 +104,33 @@ function renderShamanJoin(app, el) {
     el.querySelector('#confirm-join').disabled = true;
     app.ws.send('join_room', { roomCode: room, role: 'shaman' });
   });
+}
+
+// 神婆已进房 → 开坛法事等待页。港式开坛仪式氛围，静候苦主念咒。
+// 绝不渲染二维码 / 复制邀请链接 / 开始念咒按钮，也不绑定任何 set_lang。
+// phase 转 chanting 后由既有 phase 路由自动切走本页。
+function renderShamanWaiting(app, el) {
+  el.innerHTML = `
+    <div class="card altar-rite">
+      <h1 class="neon-title">开坛法事</h1>
+      <p class="rite-status">已入坛 · 静候开坛</p>
+
+      <div class="rite-altar" aria-hidden="true">
+        <span class="rite-item rite-candle">🕯️</span>
+        <span class="rite-item rite-talisman">🧧</span>
+        <span class="rite-item rite-fire">🔥</span>
+        <span class="rite-item rite-talisman">🧧</span>
+        <span class="rite-item rite-candle">🕯️</span>
+      </div>
+
+      <p class="rite-identity"><span class="rite-badge">神婆</span> 你是神婆</p>
+      <p class="rite-words">神婆已就位，静候苦主开坛念咒…</p>
+
+      <div id="members" class="members-line"></div>
+    </div>
+  `;
+
+  renderMembers(app, el.querySelector('#members'));
 }
 
 function renderMembers(app, box) {

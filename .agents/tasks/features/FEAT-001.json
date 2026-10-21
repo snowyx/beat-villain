@@ -1,23 +1,26 @@
 {
   "id": "FEAT-001",
-  "type": "fix",
-  "description": "根治「神婆进坛卡住」bug。真正根因（已对照实际代码核实，非猜测）：后端 server/room-server.js 的 handleJoinRoom 进房成功时确实单播 room_joined（含完整 snapshot，phase='altar'、成员含神婆 isSelf:true），字段与前端 ws.on('room_joined') 监听一致；ws-client.js 的 hello→hello_ok 首帧契约会把 join_room 排队并在 hello_ok 到达时 flush，不吞帧。所以不是协议/字段/吞帧问题。根因在前端 app/js/main.js 路由渲染：screenForState 把『神婆进房确认屏』与『在房邀请屏』都映射到同一 screen key 'invite'（phase==='altar' → 'invite'，神婆待进房 pendingJoinRoom && !roomCode 也 → 'invite'），两者区别只在 initInvite 内按 isShamanPending 选 renderShamanJoin 还是 renderVictimInvite。renderRoute 的挂载守卫 `if (appRef.current === key && el.dataset.mounted === '1') return;` 在进房成功后（key 仍为 'invite'、已挂载）提前 return，initInvite 不再被调用，界面永远停在禁用按钮的确认屏——即 invite 子视图应从确认屏切到在房屏，却被挂载守卫跳过。修复：让挂载守卫识别 invite 子视图 pending→已进房的语义切换，强制重渲染一次。此为渲染层根治，非打补丁。",
+  "type": "feat",
+  "description": "神婆进坛成功后看独立「开坛法事等待页」而非苦主邀请屏。altar 阶段在 invite 屏内按角色分流：苦主(role!=='shaman')保持现状看 renderVictimInvite（坛号/二维码/复制邀请链接/开始念咒按钮，绝不改坏）；已进房神婆(role==='shaman')看新的法事等待视图（港式开坛仪式氛围、香烛/符咒纸扎元素、神婆身份、坛中成员在场、民俗文案『神婆已就位，静候苦主开坛念咒…』），神婆端不出现二维码/复制邀请链接/开始念咒按钮。苦主点『开始念咒』后 phase 转 chanting，两端随既有 phase 路由自动一起进念咒屏。与需求 2 相互独立。纯前端路由+新视图，不动后端。",
   "status": "completed",
   "steps": [
-    "在 app/js/main.js 的 renderRoute(appRef) 中改造挂载守卫：在 app 对象上维护 appRef._inviteSubview（'shaman-pending' 或 'in-room'）；渲染前按 `appRef.pendingJoinRoom && !appRef.store.state.roomCode` 计算当前 invite 子视图标记；当目标 key==='invite' 且该标记与 appRef._inviteSubview 不同时，跳过提前 return 强制重渲染，并在本次渲染后更新 appRef._inviteSubview。其余屏（spell/beat/ash/fortune/altar）挂载守卫语义保持不变。",
-    "在 server/room-server.integration.test.js 的 join 用例补强断言，锁死后端进房契约正确：join_room 后神婆收到的 room_joined 快照 phase==='altar'、members.length===2 且神婆成员项 isSelf===true、role==='shaman'，防止将来误改后端把问题甩回前端。",
-    "手测/Playwright 双标签页复现：A 开坛拿坛号→复制邀请链接→B 新标签页打开 #/join?room=CODE→点『进坛代打』→B 立即进入在房屏（显示坛号、成员含苦主+神婆、『开始念咒』按钮），不再卡在禁用按钮；随后双端继续念咒→开打→落鞋确认实时同步。"
+    "读 .agents/tasks/context.json 与本文件后再动手。扩展 app/js/main.js 的 inviteSubview(appRef) 为三态：pendingJoinRoom && !store.state.roomCode → 'shaman-pending'；否则 store.state.role === 'shaman' → 'shaman-waiting'；否则 'in-room'。screenForState 对 altar 仍返回 'invite'（角色分流在 invite.js 内完成），无需改 phase 分支；确认 renderRoute 里 subviewChanged（subview !== appRef._inviteSubview）对新增第三态自然触发强制重渲染，避免停在旧子视图/闪烁。",
+    "在 app/js/screens/invite.js 把 initInvite 改为三分支：isShamanPending(app.pendingJoinRoom && !s.roomCode) → renderShamanJoin；否则 s.role === 'shaman' → 新增 renderShamanWaiting；否则 renderVictimInvite（苦主路径原样不动）。判定优先级确保 role 未定时兜底走苦主邀请屏，不误伤、不闪成神婆屏。",
+    "在 app/js/screens/invite.js 新增 renderShamanWaiting(app, el)：标题/状态『已入坛 · 静候开坛』用 neon-title 霓虹风；一行神婆身份标识『你是神婆』；民俗文案『神婆已就位，静候苦主开坛念咒…』；香烛/符咒/纸扎点缀（emoji 🕯️🧧🔥 或 CSS 绘制，严守四色与纸扎风）；复用 renderMembers 思路显示坛中成员（苦主🟢/神婆🟢 在场，可直接调用现有 renderMembers 填充一个 #members 容器）。绝不渲染二维码 canvas、#copy-link 复制邀请链接、#to-spell 开始念咒按钮，也不绑定任何向后端发 set_lang 的按钮。",
+    "在 app/css/theme.css 为法事等待页加样式（紧邻『邀请屏』区块）：香烛/符咒装饰区、『静候开坛』状态文案的多层 text-shadow 霓虹辉光（紫/金）、神婆身份徽记；呼吸辉光动画仅少量关键元素。所有色值引用 --zhu-sha-red/--liu-jin-gold/--neon-purple/--ink，不写死散色；复用 .card/.members-line/.room-code/.neon-title 保持一致。"
   ],
   "acceptance_criteria": [
-    "神婆点『进坛代打』后界面立即从确认屏切到在房邀请屏，不再卡住；按钮不再永久禁用。",
-    "cd server && npm test 全绿（含新增的进房契约断言）。",
-    "双标签页/Playwright 跑通 开坛→进坛→双端同步落鞋 全流程无卡顿。"
+    "node --test app/js/compliance.test.js 仍 8/8 通过（改动未破坏前端模块加载）。",
+    "双浏览器手测：A(苦主)开坛后邀请屏与现状一致（坛号/二维码/复制邀请链接/开始念咒按钮俱全，未退化）。",
+    "B(神婆)粘贴 #/join?room=CODE → 点进坛代打 → 进房成功后显示法事等待页：有『神婆』身份与『静候苦主开坛念咒…』文案与坛中成员在场点；无二维码、无复制邀请链接、无开始念咒按钮；无闪烁、不停在旧进房确认屏。",
+    "回 A 点『开始念咒』→ A、B 两端自动一起进入念咒屏（phase→chanting 路由把法事等待页自动切走）。",
+    "控制台 0 error；页脚『本应用为民俗文化体验与解压娱乐』仍常驻；只用四色变量无写死散色。"
   ],
   "verification": [
-    "cd server && npm test",
-    "项目根 node --test app/js/compliance.test.js（确认未牵连前端合规逻辑）",
-    "cd server && npm start 起服务 + 静态托管 app/，Playwright 双 page 或两 ws 客户端复现神婆进坛不卡 + 双端同步"
+    "node --test app/js/compliance.test.js  → 期望 8/8 pass",
+    "cd server && npm test  → 期望 15/15 pass（确认未波及后端）",
+    "起后端(cd server && npm start)+前端(cd app && python3 -m http.server 5173)，两个浏览器标签页复现苦主/神婆双人流程，核对上述 acceptance_criteria 的每条现象与 0 console error（可截图法事等待页作验收）"
   ],
   "blocked_reason": null,
-  "findings": "根治完成。改动点：(1) app/js/main.js 的 renderRoute 挂载守卫——新增 inviteSubview(appRef) 纯函数（pendingJoinRoom && !roomCode → 'shaman-pending'，否则 'in-room'），在 app 对象上维护 _inviteSubview 字段；当 key==='invite' 且 subview 与 appRef._inviteSubview 不同（subviewChanged）时不提前 return，强制重渲染一次，渲染后写回 appRef._inviteSubview。其余屏（altar/spell/beat/ash/fortune）及 in-room→in-room 场景挂载守卫语义保持不变，未引入无关回归。(2) server/room-server.integration.test.js 的 join 用例补强断言：room_joined 快照 phase==='altar'、members.length===2、含 isSelf 成员项且其 role==='shaman'，锁死后端进房契约（后端 makeSnapshot(room,selfClientId) 本就正确填充 isSelf，经 makeSnapshot 单测佐证）。未动任何视觉/合规表层，两份 steering 不受影响。验证：cd server && npm test → 15/15 全绿（含新增进房契约断言与双客户端全链路到 88 化灰出签）；项目根 node --test app/js/compliance.test.js → 8/8 全绿；Playwright 双标签页复现：苦主开坛(坛号 SMFVMY)→神婆打开 #/join?room=SMFVMY 显示确认屏→点『进坛代打』后立即切到在房邀请屏（显示坛号、苦主🟢/神婆🟢、『开始念咒』按钮可用），不再卡在禁用按钮。已清理后台 ws 服务与静态服务器及临时文件。注意（非本任务范围，后续可选）：苦主端在已挂载的 in-room invite 屏上收到 member_change 时，因挂载守卫（in-room→in-room 未变）不重渲染，成员行『神婆』状态点不会即时刷新为🟢——此为既有行为，与本 bug（神婆卡住）无关，本次刻意不扩大守卫改动以免回归。TARGET_HITS 仍为 88（任务2 FEAT 另行处理改 8）。"
+  "findings": "实现完成。改动三文件：\n- app/js/main.js：inviteSubview(appRef) 扩为三态——pendingJoinRoom && !roomCode → 'shaman-pending'；store.state.role==='shaman' → 'shaman-waiting'；否则 'in-room'。screenForState 对 altar 仍返回 'invite'（角色分流在 invite.js 内完成），phase 分支未动。renderRoute 的 subviewChanged(subview !== _inviteSubview) 对新第三态自然触发强制重渲染，神婆进房成功后不会停在旧确认屏。_inviteSubview 注释已更新为三态。\n- app/js/screens/invite.js：initInvite 三分支——isShamanPending → renderShamanJoin；s.role==='shaman' → 新增 renderShamanWaiting；否则（role 未定或 victim）兜底 renderVictimInvite（苦主路径原样未动）。新增 renderShamanWaiting(app, el)：card.altar-rite 容器，neon-title『开坛法事』+『已入坛·静候开坛』状态、香烛/符咒/纸扎 emoji 🕯️🧧🔥 装饰区、神婆身份徽记『你是神婆』、民俗文案『神婆已就位，静候苦主开坛念咒…』、复用现有 renderMembers 填充 #members 显示坛中成员（苦主/神婆在场点）。神婆端不渲染二维码 canvas、#copy-link、#to-spell，不绑定任何 set_lang。\n- app/css/theme.css：紧邻邀请屏区块新增『开坛法事等待页』样式（.altar-rite/.rite-status/.rite-altar/.rite-item/.rite-candle/.rite-fire/.rite-talisman/.rite-identity/.rite-badge/.rite-words + riteGlow/riteFlicker 呼吸辉光动画）。全部色值引用 --zhu-sha-red/--liu-jin-gold/--neon-purple/--ink，复用 .card/.members-line/.neon-title，无写死散色。\n路由机制未改：苦主点『开始念咒』→ set_lang → 后端推 phase=chanting → room_state 路由两端自动进念咒屏，法事等待页随 phase 自动切走。role 判定优先 store.state.role；role 未定时兜底苦主屏，不误伤、不闪烁。\n未动后端、未动 compliance.js、页脚合规声明未移除。\n验证：node --test app/js/compliance.test.js → 8/8 pass；cd server && npm test → 15/15 pass；node --check main.js/invite.js 均 OK。无构建步骤未执行 build。"
 }
