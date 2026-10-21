@@ -1,0 +1,16 @@
+app/js/main.js
+  h_57a4b15c8feaaa 10,162-164
+app/js/screens/invite.js
+  h_57a4b15c8feaaa 23-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6767bb9cce73a2a66dae4e83a852abde17893b29",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
