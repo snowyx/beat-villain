@@ -6,7 +6,7 @@
 
 ## 1. 概述（Overview）
 
-赛博打小人是一款 **H5 竖屏多人解压仪式应用**：前端为纯静态单页（`app/`），后端为单文件 Node WebSocket 房间服务（`server/`，`ws` 库，内存存房间，无数据库）。苦主开坛立牌、起花名、选罪状，生成房间码/邀请链接/二维码；神婆扫码进房代打；双方选三语咒语念开打令，抄鞋抽打至 88 鞋，小人化灰（祥云消散），最后 canvas 生成赛博符咒转运签。**任一方落鞋经 WebSocket 实时同步给房间内所有人，后端内存状态是单一事实源。**
+赛博打小人是一款 **H5 竖屏多人解压仪式应用**：前端为纯静态单页（`app/`），后端为单文件 Node WebSocket 房间服务（`server/`，`ws` 库，内存存房间，无数据库）。苦主开坛立牌、起花名、选罪状，生成房间码/邀请链接/二维码；神婆扫码进房代打；双方选三语咒语念开打令，抄鞋抽打至 8 鞋，小人化灰（祥云消散），最后 canvas 生成赛博符咒转运签。**任一方落鞋经 WebSocket 实时同步给房间内所有人，后端内存状态是单一事实源。**
 
 本设计锁定以下技术栈，一经批准不再更改：
 
@@ -77,8 +77,8 @@
                            │ 任一成员 start_beat
                            ▼
                         beating
-                 (接收 hit，后端 hits++ 直到 88)
-                           │ hits >= 88（后端判定）
+                 (接收 hit，后端 hits++ 直到 8)
+                           │ hits >= 8（后端判定）
                            ▼
                         burning  ──(化灰动画时长后，由后端定时或"下一步")──▶
                  (广播 burn 事件)                                            │
@@ -91,8 +91,8 @@
 
 - **altar（开坛/等待神婆）**：房间刚创建，`hits=0`，`villainStage=嚣张`，`lang` 未定，成员含苦主。等待神婆进房；神婆进/出房只改成员列表，不改 `phase`。允许从此态进入 `chanting`（任一成员选定语言或点「开始念咒」）。
 - **chanting（念咒）**：已进入念咒界面，可反复切换三语语言、反复播放开打令。`set_lang` 在此态或 `altar` 态均允许，后端把 `lang` 同步全房。任一成员点「开打」→ `beating`。为避免误触回退，`chanting` 不允许回到 `altar`。
-- **beating（开打）**：接受 `hit` 事件，后端对 `hits` 累加（权威），据 `hits/88` 推进 `villainStage`。达到 88 自动 → `burning`。此态忽略 `set_lang`（咒语已定）。
-- **burning（化灰）**：后端在 `hits` 首次达到 88 的那一刻把 `phase` 置为 `burning`、`burned=true`，广播 `burn` 事件；此后 **忽略一切 `hit`**（计数封顶 88，幂等）。后端在广播 `burn` 后进入 `fortune`：MVP 采用「后端随 `burn` 一并抽签并把 `phase` 置为 `fortune`」，前端自行按动画时长先播化灰、再显签文，避免再引入一次服务端定时器往返。
+- **beating（开打）**：接受 `hit` 事件，后端对 `hits` 累加（权威），据 `hits/8` 推进 `villainStage`。达到 8 自动 → `burning`。此态忽略 `set_lang`（咒语已定）。
+- **burning（化灰）**：后端在 `hits` 首次达到 8 的那一刻把 `phase` 置为 `burning`、`burned=true`，广播 `burn` 事件；此后 **忽略一切 `hit`**（计数封顶 8，幂等）。后端在广播 `burn` 后进入 `fortune`：MVP 采用「后端随 `burn` 一并抽签并把 `phase` 置为 `fortune`」，前端自行按动画时长先播化灰、再显签文，避免再引入一次服务端定时器往返。
 - **fortune（出签）**：签文在进入该态时由后端抽取并**锁定**（存入 `room.fortune`），广播 `fortune`。重连或重复请求只回同一签文；分享图在前端用该签文重复绘制，签文不变。这是终态；MVP 不提供「再来一局」（可作 P1）。
 
 非法转移处理：后端对与当前 `phase` 不符的客户端消息一律**静默忽略并回一帧当前权威 `room_state`**（例如 `beating` 阶段收到 `set_lang`，或 `burning/fortune` 阶段收到 `hit`），**不下发 `error` 帧、不中断连接**（归类为 `PHASE_REJECTED`，开发期仅 `console.debug`；与 §4.5 措辞一致）。这保证断线重连、双端时序错位时状态自愈。
@@ -135,7 +135,7 @@
 | `room_state` | `{ snapshot }` | 全量房间快照（广播或单播对齐）。见 §4.3 |
 | `hit` | `{ hits, villainStage, by }` | 落鞋广播增量：最新权威 `hits`、小人阶段、落鞋者角色 `by` |
 | `villain_state` | `{ villainStage, hits }` | 小人阶段变化（阶段跨越阈值时单独广播，便于前端切表情/音效） |
-| `burn` | `{ hits:88 }` | 化灰广播：触发祥云消散 + 赛博纸钱 + 「晦气退散」 |
+| `burn` | `{ hits:8 }` | 化灰广播：触发祥云消散 + 赛博纸钱 + 「晦气退散」 |
 | `fortune` | `{ yi, ji, guiren }` | 签文广播：宜 / 忌 / 贵人，三项锁定值 |
 | `member_change` | `{ members:[{clientId,role,online,isSelf}], count }` | 成员进出/在线态变化。`members[]` 项结构与 §4.3 snapshot 一致（含 `clientId`/`isSelf`，`isSelf` 逐连接填充） |
 | `error` | `{ code, message }` | 业务错误（见 §4.5），不中断连接 |
@@ -151,8 +151,8 @@
   "flower": "卷王本卷",
   "crimes": ["抢功劳", "阴阳怪气"],
   "lang": "zh-HK",                 // 未定时为 null
-  "hits": 42,                      // 权威落鞋计数，0..88
-  "target": 88,
+  "hits": 4,                       // 权威落鞋计数，0..8
+  "target": 8,
   "villainStage": "懵逼",           // 嚣张|懵逼|冒烟|化灰
   "burned": false,
   "fortune": null,                  // { yi, ji, guiren } 或 null
@@ -167,7 +167,7 @@
 
 ### 4.4 广播规则
 
-1. **落鞋同步**：任一方发 `hit`，后端对权威 `hits` 累加（封顶 88），然后**向房间内所有在线成员广播** `hit`（含最新 `hits`、`villainStage`、落鞋者 `by`）。若该次落鞋跨越了阶段阈值，追加广播一帧 `villain_state`；若达到 88，追加广播 `burn` 并随后 `fortune`。**发起者也收到广播**，前端以广播到达为准渲染计数，本地点击只先播放「单次弹跳 + 音效」的即时手感，不本地加计数（避免与权威值打架）。
+1. **落鞋同步**：任一方发 `hit`，后端对权威 `hits` 累加（封顶 8），然后**向房间内所有在线成员广播** `hit`（含最新 `hits`、`villainStage`、落鞋者 `by`）。若该次落鞋跨越了阶段阈值，追加广播一帧 `villain_state`；若达到 8，追加广播 `burn` 并随后 `fortune`。**发起者也收到广播**，前端以广播到达为准渲染计数，本地点击只先播放「单次弹跳 + 音效」的即时手感，不本地加计数（避免与权威值打架）。
 2. **切咒语同步**：`set_lang` → 更新 `room.lang` → 向全房广播 `room_state`，全房共用同一语言。
 3. **化灰 / 签文同步**：由后端单点判定与抽取，`burn`、`fortune` 广播给全房，保证所有人看到一致的化灰时刻与同一签文。
 4. **进出房同步**：成员进/出/断线 → 广播 `member_change` + `room_state`。
@@ -218,7 +218,7 @@ const rooms = new Map();           // roomCode -> Room
 const socketMeta = new WeakMap();  // ws -> { clientId, roomCode, role }
 
 // Room 形状
-// { code, flower, crimes, lang, hits, target:88, villainStage, phase,
+// { code, flower, crimes, lang, hits, target:8, villainStage, phase,
 //   burned, fortune, members: Map<clientId, { role, ws, online }> }
 ```
 
@@ -228,7 +228,7 @@ const socketMeta = new WeakMap();  // ws -> { clientId, roomCode, role }
 - `makeSnapshot(room, selfClientId)`：按 §4.3 产出快照。成员项暴露 `{clientId, role, online, isSelf}`——`isSelf` 由 `selfClientId` 逐连接计算（广播时对每条连接各算一次），**不外泄 `ws` 句柄**；`clientId` 是成员稳定标识，可外泄（它仅用于前端识别「哪个是我」与重连认领，不含真实身份信息）。
 - `broadcast(room, msg)`：遍历 `members` 在线 `ws` 发送同一 JSON。**例外**：携带 `snapshot` 的 `room_state`/`member_change` 需逐连接把 `isSelf` 按收信方 `clientId` 填充，因此这类帧用 `broadcastSnapshot(room)`——对每条在线连接各调一次 `makeSnapshot(room, 其 clientId)` 后发送（内容相同、仅 `isSelf` 不同）。纯增量帧（`hit`/`villain_state`/`burn`/`fortune`）用普通 `broadcast` 发同一 JSON。
 - `singleSend(ws, msg)`：对单连接发送（含发送前 `readyState === OPEN` 判断）。
-- `applyHit(room)`：`if (room.phase !== 'beating') return;` → `room.hits = Math.min(88, room.hits + 1)` → `recomputeStage(room)` → 若达 88 则 `enterBurning(room)`。**幂等封顶**保证重复/竞态 `hit` 不越界。
+- `applyHit(room)`：`if (room.phase !== 'beating') return;` → `room.hits = Math.min(8, room.hits + 1)` → `recomputeStage(room)` → 若达 8 则 `enterBurning(room)`。**幂等封顶**保证重复/竞态 `hit` 不越界。
 - `recomputeStage(room)`：按 §6 阈值把 `hits` 映射到四阶段，阶段变化时标记需广播 `villain_state`。
 - `enterBurning(room)`：`phase='burning'；burned=true`；广播 `burn`；随后 `room.fortune = drawFortune()`；`phase='fortune'`；广播 `fortune`。
 - `drawFortune()`：从预置文案库（§7）各列随机抽一条，组装 `{yi,ji,guiren}`，**写入 `room.fortune` 后锁定**；若已存在则直接返回，保证重连一致。
@@ -240,16 +240,16 @@ const socketMeta = new WeakMap();  // ws -> { clientId, roomCode, role }
 
 ## 6. 小人表情阶段与物理（`villain.js`）
 
-四阶段按 `hits` 占 `target=88` 的比例推进（需求 4.4）：
+四阶段按 `hits` 占 `target=8` 的比例推进（需求 4.4）：
 
 | 阶段 | 区间（hits） | 视觉 |
 | --- | --- | --- |
-| 嚣张 | 0 – 21 | 叉腰、咧嘴、微微抖动挑衅 |
-| 懵逼 | 22 – 43 | 眼睛变圈、冒问号 |
-| 冒烟 | 44 – 87 | 头顶冒烟、身体倾斜、裂纹 |
-| 化灰 | 88（终态） | 祥云消散（见 §9 合规） |
+| 嚣张 | 0 – 2 | 叉腰、咧嘴、微微抖动挑衅 |
+| 懵逼 | 3 – 4 | 眼睛变圈、冒问号 |
+| 冒烟 | 5 – 7 | 头顶冒烟、身体倾斜、裂纹 |
+| 化灰 | 8（终态） | 祥云消散（见 §9 合规） |
 
-阈值取 `Math.floor` 的整数边界：`stage = hits<22?嚣张 : hits<44?懵逼 : hits<88?冒烟 : 化灰`。小人用 canvas 2D 绘制纸片人；每次落鞋触发一次弹跳：以阻尼正弦 `y = A·e^(−t/τ)·sin(ωt)` 的缩放/位移做 300–400ms 弹跳回弹，叠加一个抖动与「拖鞋印」粒子。弹跳是纯前端表现，每收到一条 `hit` 广播就播一次，不依赖本地计数。**高频连打下弹跳动画为单实例（评审发现 10 的处置）**：收到新 `hit` 时**重置该单一 tween 的相位（retrigger，`t=0`）而非叠加新 tween**，避免多条广播密集到达时动画堆叠/卡顿；「拖鞋印」粒子可独立短暂叠加（数量有上限）。
+阈值取 `Math.floor` 的整数边界：`stage = hits<3?嚣张 : hits<5?懵逼 : hits<8?冒烟 : 化灰`。小人用 canvas 2D 绘制纸片人；每次落鞋触发一次弹跳：以阻尼正弦 `y = A·e^(−t/τ)·sin(ωt)` 的缩放/位移做 300–400ms 弹跳回弹，叠加一个抖动与「拖鞋印」粒子。弹跳是纯前端表现，每收到一条 `hit` 广播就播一次，不依赖本地计数。**高频连打下弹跳动画为单实例（评审发现 10 的处置）**：收到新 `hit` 时**重置该单一 tween 的相位（retrigger，`t=0`）而非叠加新 tween**，避免多条广播密集到达时动画堆叠/卡顿；「拖鞋印」粒子可独立短暂叠加（数量有上限）。
 
 ## 7. 文案库（罪状 / 咒语 / 签文）
 
@@ -355,7 +355,7 @@ export const CONFIG = {
     ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
       ? 'ws://localhost:8080'
       : 'wss://REPLACE_WITH_ROOM_SERVER_HOST'),
-  TARGET_HITS: 88,
+  TARGET_HITS: 8,
   AUDIO_MANIFEST: { 'zh-CN': false, 'zh-HK': false, 'en-US': false },
 };
 ```
@@ -367,7 +367,7 @@ export const CONFIG = {
 ## 14. 边界与异常（Edge Cases）
 
 - **双方同时落鞋**：事件循环串行化两次 `applyHit`，`hits` 正确 +2，两条 `hit` 广播先后到达，前端按最新 `hits` 渲染（可能跳 1 格，可接受）。
-- **落鞋越界**：`applyHit` 封顶 88 且 `burning/fortune` 阶段忽略 `hit`，杜绝超打。
+- **落鞋越界**：`applyHit` 封顶 8 且 `burning/fortune` 阶段忽略 `hit`，杜绝超打。
 - **断线重连**：客户端重连时**在 `hello` 帧带旧 `clientId`**（非重发 `join_room`），后端认领同一成员槽、`online=true`、不占新槽、不触发 `ROOM_FULL`，随后单播 `room_state` 对齐计数/阶段/签文（需求 4.7/7.5）。重连窗口由 `cleanupRoom` 延时（60s）保障。
 - **房间已散**：重连超窗口房间已回收 → 后续 `set_lang`/`hit`/`join_room` 回 `ROOM_NOT_FOUND`，前端提示「房间已散场」。
 - **第三人进房**：`join_room` 时已认领落鞋成员数满 2 → `ROOM_FULL`（MVP 不含围观，围观属 P1）。
@@ -378,8 +378,8 @@ export const CONFIG = {
 
 ## 15. 可测试性（Testability）
 
-- **后端单元可测**（纯函数/状态机，Node 原生 `node:test` 或 `assert`，无框架依赖，符合「轻量」）：`genRoomCode()` 唯一性与字符集、`applyHit()` 封顶与阶段推进、`recomputeStage()` 四阶段阈值边界（0/21/22/43/44/87/88）、`drawFortune()` 锁定幂等、`makeSnapshot(room, selfClientId)` 的 `isSelf` 逐连接正确且不外泄 `ws` 句柄、`ROOM_FULL` 判定按已认领 `clientId` 落鞋成员数计且重连带旧 `clientId` 不触发房满。
-- **后端集成可测**：用 `ws` 客户端起两个连接走「建房→进房→切咒语→连打到 88→化灰→签文」全链路，断言两端收到的 `room_state`/`burn`/`fortune` 一致；断线重连后快照对齐。
+- **后端单元可测**（纯函数/状态机，Node 原生 `node:test` 或 `assert`，无框架依赖，符合「轻量」）：`genRoomCode()` 唯一性与字符集、`applyHit()` 封顶与阶段推进、`recomputeStage()` 四阶段阈值边界（0/2/3/4/5/7/8）、`drawFortune()` 锁定幂等、`makeSnapshot(room, selfClientId)` 的 `isSelf` 逐连接正确且不外泄 `ws` 句柄、`ROOM_FULL` 判定按已认领 `clientId` 落鞋成员数计且重连带旧 `clientId` 不触发房满。
+- **后端集成可测**：用 `ws` 客户端起两个连接走「建房→进房→切咒语→连打到 8→化灰→签文」全链路，断言两端收到的 `room_state`/`burn`/`fortune` 一致；断线重连后快照对齐。
 - **前端可测/可手测**：`compliance.js` 的拦截规则用一组真名/花名样例做纯函数单测；`audio.js` 回退分支用桩（stub `window.speechSynthesis` 与 `AUDIO_MANIFEST`）验证三级选择；UI 流程以人工 smoke test（可挂 Kiro hook 在改前端后提示跑冒烟）。
 - **难测点与对策**：canvas 像素输出不做像素级断言，仅测绘制函数「不抛错 + 产出非空 blob」；动画时序属观感，走人工验收。
 

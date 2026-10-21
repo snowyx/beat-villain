@@ -1,6 +1,6 @@
 // 后端集成测试（node:test + 真实 ws 客户端），依据 design §15 / FEAT-002。
-// 两个连接走：hello→建房→进房→切咒语→连打到 88→化灰→签文 全链路，
-// 断言两端 room_state/burn/fortune 一致、hits 封顶 88、断线重连后快照对齐。
+// 两个连接走：hello→建房→进房→切咒语→连打到 8→化灰→签文 全链路，
+// 断言两端 room_state/burn/fortune 一致、hits 封顶 8、断线重连后快照对齐。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -83,7 +83,7 @@ function snapOf(msg) {
   return msg.data.snapshot || msg.data;
 }
 
-test('集成：双客户端全链路 hello→建房→进房→切咒语→打到88→化灰→签文', async (t) => {
+test('集成：双客户端全链路 hello→建房→进房→切咒语→打到8→化灰→签文', async (t) => {
   const { wss, port } = await startTestServer();
   const url = `ws://127.0.0.1:${port}`;
   t.after(() => new Promise((res) => wss.close(res)));
@@ -133,15 +133,15 @@ test('集成：双客户端全链路 hello→建房→进房→切咒语→打�
   assert.equal(snapOf(vBeat).phase, 'beating');
   assert.equal(snapOf(sBeat).phase, 'beating');
 
-  // 连打到 88：两端各打一部分（后端权威累加）
+  // 连打到 8：两端各打一部分（后端权威累加，累计 8 次）
   // 监听 burn/fortune（两端都应收到）
   const vBurn = victim.waitFor('burn');
   const sBurn = shaman.waitFor('burn');
   const vFortune = victim.waitFor('fortune');
   const sFortune = shaman.waitFor('fortune');
 
-  for (let i = 0; i < 50; i++) victim.send('hit', { roomCode });
-  for (let i = 0; i < 50; i++) shaman.send('hit', { roomCode }); // 超打，验证封顶
+  for (let i = 0; i < 5; i++) victim.send('hit', { roomCode });
+  for (let i = 0; i < 5; i++) shaman.send('hit', { roomCode }); // 累计超打，验证封顶
 
   const [vb, sb, vf, sf] = await Promise.all([vBurn, sBurn, vFortune, sFortune]);
   assert.equal(vb.data.hits, TARGET_HITS);
@@ -152,7 +152,7 @@ test('集成：双客户端全链路 hello→建房→进房→切咒语→打�
     { yi: sf.data.yi, ji: sf.data.ji, guiren: sf.data.guiren },
   );
 
-  // 断线重连：苦主断开后带旧 clientId 重连，快照对齐（phase=fortune、hits=88、签文同值）
+  // 断线重连：苦主断开后带旧 clientId 重连，快照对齐（phase=fortune、hits=8、签文同值）
   const oldClientId = victim.clientId;
   await victim.close();
   const reconnected = new Client(url);

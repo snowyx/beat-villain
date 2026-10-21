@@ -15,7 +15,7 @@ export const CONFIG = {
     (isLocalHost ? 'ws://localhost:8080' : 'wss://REPLACE_WITH_ROOM_SERVER_HOST'),
 
   // 落鞋目标（与后端 TARGET_HITS 一致）。
-  TARGET_HITS: 88,
+  TARGET_HITS: 8,
 
   // mp3 静态清单（design §8）：本次不预生成，三者皆 false → 运行时走 Web Speech。
   // scripts/generate-audio.mjs 生成 mp3 后，手动把对应项置 true 即走 mp3 分支。

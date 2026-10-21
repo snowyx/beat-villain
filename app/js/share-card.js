@@ -24,7 +24,7 @@ export function drawShareCard(data = {}) {
   const {
     flower = '小人',
     crimes = [],
-    hits = 88,
+    hits = 8,
     fortune = { yi: '', ji: '', guiren: '' },
     roomCode = '',
   } = data;
