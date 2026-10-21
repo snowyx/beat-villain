@@ -1,28 +1,28 @@
 {
   "id": "FEAT-002",
-  "type": "refactor",
-  "description": "打击目标从 88 鞋改为 8 鞋，全链路一致。新四阶段阈值：嚣张 0-2 / 懵逼 3-4 / 冒烟 5-7 / 化灰 8（边界判定 hits<3 嚣张 / <5 懵逼 / <8 冒烟 / >=8 化灰）。前后端常量、四阶段阈值、单测边界、design.md/requirements.md/README.md 全部对齐 8；三语咒语文案不动。独立于 FEAT-001，但必须排在 FEAT-003 之前——FEAT-003 的分阶段表情直接复用这里定下的新阈值。",
+  "type": "feat",
+  "description": "打小人时新增『鞋拔子/拖鞋』挥击动画：每次有效落鞋，画面上一只鞋拔子（首选，退化可用拖鞋）从屏幕侧上方快速挥下、拍到小人被击中的部位、短暂定格命中后回弹消失，形成『抄起鞋拔子啪一下打下去』的力度感，配合既有整体弹跳、部位反应(晃头/弓身/跳脚)、拟声词粒子。canvas 2D 绘制，纸扎卡通风、金边、严守四色，绝无伤口/血液/断肢（卡通喜剧动作，朱砂红只作道具/符咒不作血）。纯本地即时视觉反馈（方案 B：不走后端同步）。命中位置用 beat.js 已有部位判定结果（villain.parts/hitPartAt 的头/肚子/腿坐标区域）。既有拖鞋印粒子保留，与新动作时间错开避免视觉冲突。与需求 1 相互独立。",
   "status": "completed",
   "steps": [
-    "server/room-server.js：TARGET_HITS 88→8（约第 19 行）；stageForHits() 边界 hits<22/<44/<88 改为 hits<3/<5/<8；顶部注释与函数注释里的旧阈值（0-21/22-43/44-87/88、hits<22…<88…88）改为新阈值；applyHit/enterBurning 对 TARGET_HITS 的引用随常量自动生效，逻辑不改。",
-    "server/room-server.test.js：stageForHits 边界用例 0/21/22/43/44/87/88 → 0/2/3/4/5/7/8（0,2 嚣张；3,4 懵逼；5,7 冒烟；8 化灰）；recomputeStage 用例 room.hits=22 改为 3、room.hits=30 改为同阶段内无跨越值（如 4）；applyHit 累加用例『打 22 下→懵逼』改『打 3 下→懵逼』；封顶断言文案 'hits 封顶 88' 改 '封顶 8'（值依赖常量自动变 8）；enterBurning 用例 room.hits=88 改为 8。",
-    "server/room-server.integration.test.js：全链路『连打到 88』改『连打到 8』，两端分摊落鞋改为累计 8 次；vb.data.hits===TARGET_HITS、重连后 snap.hits===TARGET_HITS 依赖常量自动为 8。",
-    "app/js/config.js：TARGET_HITS: 88 → 8 并更新相邻注释（store.js 的 target 读 CONFIG.TARGET_HITS、beat.js 计数显示 x/target 自动生效）。",
-    ".kiro/specs/kick-bad-guy/design.md：§1 概述、§3 状态机（hits>=88/达到88/首次达到88）、§4.2 burn{hits:88}、§4.3 示例 hits:42/target:88/注释 0..88、§4.4 封顶88、§6 阶段表(0-21/22-43/44-87/88)与 stage=hits<22?… 公式、§15 可测性边界(0/21/22/43/44/87/88)与连打到88，全部改为 8 与新阈值。",
-    ".kiro/specs/kick-bad-guy/requirements.md：概述『88 鞋』、4.1『目标 88 鞋』、4.4『占 88 鞋的比例』、5『打满 88 鞋』、5.1『达到 88』、附注『递增至 88』全部改 8。",
-    "README.md：流程表『打满 88 鞋』、玩法『嚣张 0-21 → 懵逼 22-43 → 冒烟 44-87 → 化灰 88』『打满 88 鞋』改为 8 与新阈值。.kiro/steering/民俗合规.md 第 37 行『终态（88 鞋）』改『终态（8 鞋）』。三语咒语文案（design §7 / requirements 3.2）不动。"
+    "读 .agents/tasks/context.json 与本文件后再动手。在 app/js/villain.js 的 Villain 构造函数新增单实例挥击 tween：this.swing = { active:false, t:0, dur:0.26, part:'belly', fromX:0, fromY:0, hitX:0, hitY:0 }（dur 可微调）。",
+    "新增方法 swingAt(part)：若 burning 则忽略；key = this.parts[part] ? part : 'belly'；设 hitX = this.cx + (r.x + r.w/2)、hitY = this.cy + (r.y + r.h/2)（r=this.parts[key]），fromX/fromY 取人形侧上方屏外（如 this.W + 40, -30）；active=true,t=0（retrigger 重置相位，不叠加）。不在此直接改整体弹跳单实例规则（整体弹跳仍由 onHit 负责）。",
+    "在 _update(dt) 推进 this.swing.t，达到 dur 置 active=false；归一化 p=t/dur，定义三段：快速入(p 0→0.55 ease-in，从 from 到 hit，角度 -0.9→0.15rad)、命中定格(p 0.55→0.70 停在 hit 附近，可在进入该窗首帧调一次 this._addSlipper() 让拖鞋印落在命中后、与挥击错开)、回弹(p 0.70→1 ease-out，抬起+缩放淡出)。用插值算出当前 x,y,rot,scale,alpha。",
+    "新增 _drawShoehorn(x,y,rot,scale,alpha)：canvas 2D 画鞋拔子（细长弯柄+勺形头，金边 GOLD 描边、米黄 PAPER 纸面、柄端 RED 点缀）一眼可认；命中定格瞬间可叠一圈金/紫冲击短弧或 star 强化『啪』的力度。全部用 villain.js 顶部 RED/GOLD/PURPLE/INK/PAPER 常量，无新散色、无血。若鞋拔子难辨识可退化为拖鞋造型（椭圆鞋底+鞋面带）。",
+    "在 _draw() 的拖鞋印之后、人形绘制之后新增挥击层：this.swing.active 时调 _drawShoehorn(...)（置于人形之上表现拍下去），注意 burning 分支已提前 return 不画挥击。",
+    "在 app/js/screens/beat.js 的 smack(part) 内，于 villain.onHit()/villain.onHitPart(part) 旁调用 villain.swingAt(part)（part 来自 hitPartAt，底部按钮兜底 'belly'）。并在对端 hit 广播处 app._beatHitUnsub = app.onHitFrame(() => { villain.onHit(); ... }) 补 villain.swingAt('belly')（对端 hit 帧不带 part，默认肚子），使两端都有挥击爽感。"
   ],
   "acceptance_criteria": [
-    "后端 TARGET_HITS 为 8，stageForHits 按 0-2/3-4/5-7/8 分阶段。",
-    "cd server && npm test 全绿（新阈值边界用例 + 打到 8 的全链路集成）。",
-    "前端开打计数显示 0/8，打到 8 触发化灰+签文。",
-    "全仓无残留 88 鞋表述（咒语文案除外）；四阶段阈值四处一致（后端常量注释、design §6、README、villain.js 注释）。"
+    "开打屏点小人头/肚子/腿三处，每次都能看到一只鞋拔子/拖鞋从侧上方快速挥下、拍到对应被击中部位、短暂定格后回弹消失，有明显挥击力度感。",
+    "挥击与既有整体弹跳、部位反应(晃头/弓身/跳脚)、拟声词粒子同步呈现，拖鞋印与新挥击动作不互相遮挡冲突。",
+    "标签页 A 点击时标签页 B 也出现挥击（对端默认 belly）；计数仍由后端广播同步（未本地加计数）。",
+    "打满 8 鞋化灰仍为祥云消散+赛博纸钱，无伤口/血液/断肢；鞋拔子造型一眼可认、只用四色、朱砂红不作血。",
+    "node --test app/js/compliance.test.js 仍 8/8；控制台 0 error。"
   ],
   "verification": [
-    "cd server && npm test",
-    "grep -rn \"88\" 在仓库内复核仅余无关命中",
-    "cd server && npm start + 静态托管 app/ 手测计数 0/8 并打到 8 化灰"
+    "node --test app/js/compliance.test.js  → 期望 8/8 pass",
+    "cd server && npm test  → 期望 15/15 pass",
+    "起后端+前端，双浏览器进开打屏，分别点头/肚子/腿并用底部按钮，核对挥击动画三段(快速入/定格/回弹)命中对应部位、两端同步、8 鞋化灰无血腥、0 console error（可截图挥击瞬间作验收）"
   ],
   "blocked_reason": null,
-  "findings": "打击目标已全链路从 88 改为 8，四阶段阈值定为：嚣张 0-2 / 懵逼 3-4 / 冒烟 5-7 / 化灰 8，边界判定 hits<3 / <5 / <8 / >=8。FEAT-003 的分阶段表情必须复用这组阈值与边界。改动点：server/room-server.js（TARGET_HITS=8、stageForHits 边界 <3/<5/<8、顶部与函数注释阈值）、app/js/config.js（TARGET_HITS:8）、server/room-server.test.js（stageForHits 边界 0/2/3/4/5/7/8、recomputeStage 用 3 跨越+4 同阶段、applyHit 打3下→懵逼、封顶断言文案改'封顶8'、enterBurning room.hits=8）、server/room-server.integration.test.js（标题/注释改打到8，两端各发5次累计超打验证封顶）、design.md（§1/§3/§4.2 burn{hits:8}/§4.3 hits:4 target:8 0..8/§4.4 封顶8/§5 Room target:8 与 applyHit Math.min(8)/§6 阶段表 0-2/3-4/5-7/8 与 stage=hits<3?…<5?…<8? 公式/§15 边界 0/2/3/4/5/7/8 与连打到8/§13 config TARGET_HITS:8/边界情形 封顶8）、requirements.md（概述/4.1/4.4/5/5.1/附注 全部改8）、README.md（流程表打满8、玩法阈值 0-2→3-4→5-7→8）、.kiro/steering/民俗合规.md 第37行 终态(8鞋)。附带同步了三处会显示旧阈值的前端注释/默认值以满足验收『全仓无残留88表述』：app/js/main.js burn 注释、app/js/share-card.js hits 默认值 88→8、app/js/villain.js 顶部四阶段注释（villain.js 的人形重画与部位反应仍归 FEAT-003）。未改动的残留 88 仅存在于历史评审/任务记录类文档（.kiro/specs 的 tasks.md、design-review.md/.json、task-kick-bad-guy/*、.agents/tasks/plan.md），它们描述的是历史设计状态，不在本任务 steps 范围。三语咒语文案（design §7 / requirements 3.2）未动。验证：cd server && npm test 全绿（15 单元 + 2 集成），前端 node --test app/js/compliance.test.js 8 用例全绿。"
+  "findings": "已实现鞋拔子挥击动画（纯本地，方案 B，无后端改动）。villain.js：构造函数新增单实例 tween this.swing = { active, t, dur:0.26, part, fromX/fromY, hitX/hitY, markDone }（retrigger 重置相位不叠加）。新增 swingAt(part)：burning 时忽略；key 回退 belly；hitX/hitY 取 parts 部位矩形中心（绝对画布坐标 cx+r.x+r.w/2, cy+r.y+r.h/2），起点 fromX=W+40/fromY=-30（右上方屏外）。_update 推进 swing.t，p=t/dur 三段：快速入(0→0.55 ease-in from→hit 角度 -0.9→0.15rad)、命中定格(0.55→0.70 停 hit 附近 impact 弧)、回弹淡出(0.70→1 ease-out)；在 p>=0.55 首帧调一次 _addSlipper() 让拖鞋印落在命中后、与挥击时间错开避免遮挡。新增 _drawSwing() 做三段插值得 x,y,rot,scale,alpha,impact，_drawShoehorn(x,y,rot,scale,alpha,impact) canvas 2D 画鞋拔子（细长弯柄 quadraticCurve + 勺形头 ellipse，GOLD 金边描边 / PAPER 米黄纸面 / 柄端 RED 挂绳孔点缀），命中定格叠金色冲击短弧 + PURPLE 星点强化「啪」。全部用 villain.js 顶部 RED/GOLD/PURPLE/INK/PAPER 常量，无新散色、无血。_draw() 在 _drawVillain 之后、烟雾之前，this.swing.active 时调 _drawSwing()（置于人形之上表现拍下去；burning 分支已提前 return 不画）。beat.js：smack(part) 内在 onHit()/onHitPart(part) 旁加 villain.swingAt(part)；onHitFrame 对端 hit 帧加 villain.swingAt('belly')（默认肚子）。验证：node --test app/js/compliance.test.js 8/8 pass；cd server && npm test 15/15 pass；node --check 两文件均 PARSE_OK。无 build 步骤。"
 }

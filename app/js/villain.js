@@ -42,6 +42,10 @@ export class Villain {
     this.bounce = { active: false, t: 0, dur: 0.38, amp: 0 };
     this.shakeT = 0;
 
+    // 单实例鞋拔子挥击 tween（retrigger 重置相位，不叠加）：
+    // 三段相位——快速入(0→0.55) / 命中定格(0.55→0.70) / 回弹淡出(0.70→1)。
+    this.swing = { active: false, t: 0, dur: 0.26, part: 'belly', fromX: 0, fromY: 0, hitX: 0, hitY: 0, markDone: false };
+
     // 部位局部反应：按部位的短时衰减变量（0→无反应），各自独立不影响整体弹跳。
     this.partReact = { head: 0, belly: 0, legs: 0 };
 
@@ -124,6 +128,27 @@ export class Villain {
     this.partReact[key] = 1; // retrigger：重置该部位短时衰减变量
     this._addWord(key);
     if (key === 'head') this._addStars();
+  }
+
+  /**
+   * 触发一次鞋拔子挥击动画（part ∈ 'head'|'belly'|'legs'）：鞋拔子从人形侧上方
+   * 屏外快速挥下、拍到被击中部位、短暂定格后回弹淡出。retrigger 重置相位不叠加。
+   * burning（化灰）阶段忽略——此时不画人形也不画挥击。
+   */
+  swingAt(part) {
+    if (this.burning) return;
+    const key = this.parts[part] ? part : 'belly';
+    const r = this.parts[key];
+    this.swing.active = true;
+    this.swing.t = 0; // retrigger：重置相位
+    this.swing.part = key;
+    this.swing.markDone = false;
+    // 命中点：部位矩形中心（绝对画布坐标）。
+    this.swing.hitX = this.cx + r.x + r.w / 2;
+    this.swing.hitY = this.cy + r.y + r.h / 2;
+    // 起点：人形右上方屏外（快速挥下的力度感）。
+    this.swing.fromX = this.W + 40;
+    this.swing.fromY = -30;
   }
 
   /** 跨阶段一次性特效（villain_state）：进「冒烟」播一次烟雾。 */
@@ -254,6 +279,17 @@ export class Villain {
     }
     if (this.shakeT > 0) this.shakeT -= dt;
 
+    // 鞋拔子挥击推进：到达 dur 结束；命中定格窗首帧落一次拖鞋印（与挥击时间错开，避免遮挡）。
+    if (this.swing.active) {
+      this.swing.t += dt;
+      const p = this.swing.t / this.swing.dur;
+      if (!this.swing.markDone && p >= 0.55) {
+        this.swing.markDone = true;
+        this._addSlipper();
+      }
+      if (this.swing.t >= this.swing.dur) this.swing.active = false;
+    }
+
     // 部位短时衰减（约 0.4s 衰减完）
     for (const k of ['head', 'belly', 'legs']) {
       if (this.partReact[k] > 0) this.partReact[k] = Math.max(0, this.partReact[k] - dt * 2.6);
@@ -336,6 +372,9 @@ export class Villain {
 
     this._drawVillain(this.cx + shakeX, this.cy + bounceY, squash);
 
+    // 鞋拔子挥击层（置于人形之上，表现「拍下去」）
+    if (this.swing.active) this._drawSwing();
+
     // 烟雾
     for (const p of this._smokePuffs) {
       ctx.globalAlpha = Math.max(0, p.life) * 0.5;
@@ -361,6 +400,125 @@ export class Villain {
     ctx.ellipse(0, 0, 16, 9, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+
+  /**
+   * 挥击三段相位 → 当前 x,y,rot,scale,alpha，再调 _drawShoehorn 绘制鞋拔子。
+   * 快速入(0→0.55 ease-in，from→hit，角度 -0.9→0.15rad)：抄起快速挥下；
+   * 命中定格(0.55→0.70 停在 hit 附近)：短暂停格强化「啪」；
+   * 回弹(0.70→1 ease-out)：抬起 + 缩放淡出弹回。
+   */
+  _drawSwing() {
+    const sw = this.swing;
+    const p = Math.min(1, sw.t / sw.dur);
+    let x, y, rot, scale, alpha, impact = 0;
+    if (p < 0.55) {
+      // 快速入：ease-in，位置从屏外到命中点，角度 -0.9→0.15
+      const u = p / 0.55;
+      const e = u * u; // ease-in
+      x = sw.fromX + (sw.hitX - sw.fromX) * e;
+      y = sw.fromY + (sw.hitY - sw.fromY) * e;
+      rot = -0.9 + (0.15 - -0.9) * e;
+      scale = 0.9 + 0.25 * e;
+      alpha = 0.4 + 0.6 * u;
+    } else if (p < 0.70) {
+      // 命中定格：停在命中点附近，略带下压颤动，叠冲击弧
+      const u = (p - 0.55) / 0.15;
+      x = sw.hitX;
+      y = sw.hitY + Math.sin(u * Math.PI) * 2;
+      rot = 0.15 + 0.08 * Math.sin(u * Math.PI);
+      scale = 1.15;
+      alpha = 1;
+      impact = Math.sin(u * Math.PI); // 命中冲击强度（0→1→0）
+    } else {
+      // 回弹淡出：ease-out 抬起离开
+      const u = (p - 0.70) / 0.30;
+      const e = 1 - (1 - u) * (1 - u); // ease-out
+      x = sw.hitX + (sw.fromX - sw.hitX) * e * 0.5;
+      y = sw.hitY + (sw.fromY - sw.hitY) * e * 0.5;
+      rot = 0.15 - 0.7 * e;
+      scale = 1.15 - 0.35 * e;
+      alpha = 1 - e;
+    }
+    this._drawShoehorn(x, y, rot, scale, Math.max(0, alpha), impact);
+  }
+
+  /**
+   * 鞋拔子：细长弯柄 + 勺形头，金边描边、米黄纸面、柄端红点缀；一眼可认。
+   * 命中定格 impact>0 时叠一圈金/紫冲击短弧 + 星点强化「啪」的力度感。只用四色。
+   */
+  _drawShoehorn(x, y, rot, scale, alpha, impact) {
+    const ctx = this.ctx;
+
+    // 命中冲击：在命中点先画金/紫短弧与星点（在鞋拔子之下，围绕命中点）。
+    if (impact > 0) {
+      ctx.save();
+      ctx.translate(x, y + 6);
+      ctx.globalAlpha = impact * 0.9;
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) {
+        const a0 = -Math.PI * 0.95 + i * 0.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 16 + i * 6 + impact * 6, a0, a0 + 0.6);
+        ctx.stroke();
+      }
+      ctx.fillStyle = PURPLE;
+      ctx.shadowColor = PURPLE;
+      ctx.shadowBlur = 8;
+      star(ctx, 0, 0, 7 + impact * 3, 3, 4);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.scale(scale, scale);
+    // 鞋拔子沿「柄朝右上、勺头朝左下（命中点）」布局：局部原点在勺头。
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // 细长弯柄（从勺头向右上延伸，略弯）
+    ctx.fillStyle = PAPER;
+    ctx.beginPath();
+    ctx.moveTo(2, -2);
+    ctx.quadraticCurveTo(34, -10, 56, -30);
+    ctx.quadraticCurveTo(60, -33, 58, -37);
+    ctx.quadraticCurveTo(56, -40, 52, -37);
+    ctx.quadraticCurveTo(30, -18, 0, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 勺形头（舀鞋跟的弧形勺面）
+    ctx.fillStyle = PAPER;
+    ctx.beginPath();
+    ctx.ellipse(-6, 4, 14, 9, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // 勺内凹影（纸纹红，极淡；非血）
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(-6, 4, 14, 9, -0.5, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(226,58,58,0.18)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(-6, 4, 9, 5, -0.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    // 柄端红点缀（挂绳孔）
+    ctx.fillStyle = RED;
+    ctx.beginPath();
+    ctx.arc(56, -34, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   /**

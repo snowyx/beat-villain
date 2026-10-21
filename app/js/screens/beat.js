@@ -53,6 +53,7 @@ export function initBeat(app) {
     app.audioUnlock();
     villain.onHit();
     villain.onHitPart(part);
+    villain.swingAt(part);
     playSmack();
     app.ws.send('hit', { roomCode: app.store.state.roomCode });
   }
@@ -73,6 +74,7 @@ export function initBeat(app) {
   // hit 广播到达 → 也播一次弹跳（含对端落鞋），并更新权威计数
   app._beatHitUnsub = app.onHitFrame(() => {
     villain.onHit();
+    villain.swingAt('belly'); // 对端 hit 帧不带 part，默认拍肚子，使两端都有挥击爽感
     renderCount();
   });
   app._beatStageUnsub = app.onVillainStateFrame(({ villainStage }) => {
