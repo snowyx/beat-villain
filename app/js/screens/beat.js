@@ -47,13 +47,28 @@ export function initBeat(app) {
     villain.setStage(st.villainStage);
   }
 
-  // 落鞋：本地即时手感（弹跳+音效），不本地加计数；权威由后端广播 hit 回来
-  hitBtn.addEventListener('click', () => {
+  // 一次有效落鞋：本地即时手感（整体弹跳+部位反应+音效），不本地加计数；
+  // 权威计数由后端广播 hit 回来（方案 B：hit 帧不携带 part，部位反应纯本地呈现）。
+  function smack(part) {
     app.audioUnlock();
     villain.onHit();
+    villain.onHitPart(part);
     playSmack();
     app.ws.send('hit', { roomCode: app.store.state.roomCode });
-  });
+  }
+
+  // 画布点击：把 clientX/clientY 换算成画布 CSS 像素坐标，据 villain.parts 判定部位。
+  function onCanvasPointer(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const part = villain.hitPartAt(x, y);
+    smack(part);
+  }
+  canvas.addEventListener('pointerdown', onCanvasPointer);
+
+  // 底部按钮兜底：默认打肚子。
+  hitBtn.addEventListener('click', () => smack('belly'));
 
   // hit 广播到达 → 也播一次弹跳（含对端落鞋），并更新权威计数
   app._beatHitUnsub = app.onHitFrame(() => {

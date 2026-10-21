@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "小人升级为可打部位的港式纸扎卡通人形。现状：app/js/villain.js 的 _drawVillain 只画一个纸片方块身体 + _drawFace 一张脸，无四肢，整体弹跳；beat.js 落鞋靠底部 #hit-btn 按钮，canvas 不接收点击。目标：重画为头/躯干(肚子)/两条腿(可含手臂)的卡通纸扎人形，金边纸片质感，只用四色；canvas 上按点击落点判定命中头/肚子/腿三区，播放差异化被打反应与拟声词粒子；四阶段表情仍随累计鞋数（FEAT-002 新阈值 0-2/3-4/5-7/8）递进，部位反应叠加在当前阶段之上。部位同步推荐方案 B：部位判定与被打反应纯前端本地即时呈现，鞋数计数仍走后端单一事实源同步（hit 帧不加 part 字段）。理由：现协议把落鞋定死为『hit 只是信号、hits 由后端权威累加、不信任客户端上报』，让 part 随 hit 往返需同时改前端发送/后端透传广播/前端渲染三处并连带改协议与测试，成本与回归面大；而部位反应是观感性即时反馈（打哪抖哪），对精确同步收益低；真正需全房一致的累计鞋数/阶段/化灰/签文已由后端权威广播保证一致。依赖 FEAT-002 的新阈值。",
+  "status": "completed",
+  "steps": [
+    "重画人形：改写 app/js/villain.js 的 _drawVillain（及其脸部绘制），由单方块改为分部件卡通纸扎人形——头(含脸)、躯干/肚子、两条腿，可选两条手臂；全部用顶部已有 RED/GOLD/PURPLE/INK 四色 + roundRect 金边 + 纸纹竖线质感。为各部件定义相对 cx,cy 的布局矩形常量并挂到 this.parts = { head:{...}, belly:{...}, legs:{...} }（CSS 像素、相对画布，供部位判定复用，避免魔法数散落）。整体 bounceY/squash/shake 继续作用于全身。合规：纯卡通纸片，无伤口/血液/断肢。",
+    "部位命中反应 + 拟声词粒子：在 villain.js 增加 onHitPart(part)（part ∈ 'head'|'belly'|'legs'），据部位触发差异化本地反应叠加在当前阶段表情之上——打头→脑袋猛烈晃动+转圈眼/冒金星(金色星点粒子)；打肚子→躯干弓起/捂肚+『呃』痛苦表情；打腿→腿部弹开/跳脚。新增拟声词文字粒子系统（head→『哐』、belly→『呃/嗷』、legs→『嘶』），鎏金黄/霓虹紫描边短暂上飘淡出，数量设上限（参照 SLIPPER_MAX 粒子上限写法）。部位局部震动/变形用按部位的短时衰减变量驱动，不影响既有整体弹跳单实例 retrigger 规则。保留并可改进拖鞋印/弹跳特效。痛苦表情夸张搞笑但严守无伤口无血液。",
+    "画布点击采集与部位判定接到 onHitPart：在 app/js/screens/beat.js 给 #villain-canvas 加 pointerdown/click 监听，用 canvas.getBoundingClientRect() 把 clientX/clientY 换算成画布 CSS 像素坐标（x=e.clientX-rect.left, y=e.clientY-rect.top），据 villain.parts 区域矩形判定 head/belly/legs（落在人形外或无法判定默认按躯干，保证每次点击都算一次有效落鞋）；命中后本地 villain.onHit()+villain.onHitPart(part)+playSmack()，并照旧 app.ws.send('hit',{roomCode}) 走后端权威计数（不传 part，方案 B）。保留底部 #hit-btn 作兜底，点按钮默认 onHitPart('belly')。收到后端 hit 广播仍 villain.onHit()+更新权威计数（对端落鞋触发整体弹跳，部位反应仅发起端本地呈现）。",
+    "文档对齐（轻量）：design.md §6 小人段补一句『人形分头/肚子/腿三区，按点击落点本地播差异化被打反应与拟声词，部位反应本地即时、计数走后端权威（方案 B）』；README.md 玩法『抄鞋开打』补『点小人的头/肚子/腿有不同痛苦反应』。阈值沿用 FEAT-002 新值不回退。"
+  ],
+  "acceptance_criteria": [
+    "小人呈现头/肚子/腿的卡通纸扎人形，四色与金边符合视觉 steering，无写实人像、无血腥。",
+    "点击画布头/肚子/腿三区分别出现差异化被打反应与对应拟声词；部位反应叠加在当前阶段表情之上。",
+    "鞋数计数仍以后端为准、双端同步；打满 8（FEAT-002 阈值）双端同时化灰，化灰只有祥云消散+赛博纸钱。",
+    "node --test app/js/compliance.test.js 全绿（合规逻辑未被牵连）。"
+  ],
+  "verification": [
+    "项目根 node --test app/js/compliance.test.js",
+    "cd server && npm test（确认计数同步链路未破）",
+    "cd server && npm start + 静态托管 app/，Playwright 双 page 点击 A 画布头/肚子/腿三区断言对应反应，且 B 计数随之 +1 同步，打满 8 双端化灰"
+  ],
+  "blocked_reason": null,
+  "findings": "已完成。app/js/villain.js 重画为纸扎卡通人形：this.parts={head,belly,legs} 为相对中心(this.cx,this.cy)的 CSS 像素矩形（head{-22,-72,44,42} belly{-30,-28,60,56} legs{-26,30,52,50}），含两腿(带红纸鞋)+两臂。新增 hitPartAt(x,y)（画布 CSS 像素→部位，落人形外默认 belly）、onHitPart(part)（partReact 短时衰减 head/belly/legs + 拟声词文字粒子 words(上限 WORD_MAX=10) + 打头金星 stars(上限 STAR_MAX=18)）；差异化反应：打头晃头+转圈螺旋眼+金星『哐/咚』、打肚子弓身捂臂+『呃』痛苦脸『呃/嗷』、打腿跳脚外甩『嘶/噢』。整体 bounce/squash/shake 与阶段表情(嚣张/懵逼/冒烟)保留并叠加。采用方案 B：beat.js canvas pointerdown→hitPartAt→smack(part)=onHit()+onHitPart(part)+playSmack()+ws.send('hit',{roomCode}) 不传 part；#hit-btn 兜底默认 belly；后端 hit 广播仍仅 villain.onHit()（部位反应只发起端本地）。为端到端验证在 main.js boot() 加了一行无副作用调试钩子 window.__app=app。文档：design.md §6 与 README.md 玩法第 4 步各补一句。四色+金边+纸纹，无血腥。验证全绿：server npm test 15/15、根 node --test compliance.test.js 8/8、Playwright 双 page 点击 head/belly/legs 确认差异化(head stars=6+head react / belly react 无新增 stars / legs react)且 B 端权威计数 0→3 同步。阈值沿用 FEAT-002 的 8 未回退。"
+}

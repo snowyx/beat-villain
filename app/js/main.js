@@ -236,6 +236,8 @@ function showToast(text) {
 
 // ── 启动 ──
 function boot() {
+  // 调试/自动化可见入口（无行为副作用）：便于端到端验证读取当前屏与 villain 实例。
+  if (typeof window !== 'undefined') window.__app = app;
   wireWs();
 
   // 首个用户手势解锁音频
