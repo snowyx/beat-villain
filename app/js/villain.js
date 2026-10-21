@@ -76,6 +76,8 @@ export class Villain {
     const rect = this.canvas.getBoundingClientRect();
     const w = rect.width || 320;
     const h = rect.height || 360;
+    // 尺寸未变则跳过，避免重设 backing store（会清屏并产生无谓开销）。
+    if (this.W === w && this.H === h && this.canvas.width) return;
     this.canvas.width = Math.round(w * this.dpr);
     this.canvas.height = Math.round(h * this.dpr);
     this.W = w;
@@ -224,8 +226,12 @@ export class Villain {
     if (this.running) return;
     this.running = true;
     this._last = performance.now();
+    // 构造时画布可能尚未完成布局（getBoundingClientRect 为 0 → 回退 320×360，
+    // 导致 backing store 尺寸与实际 CSS 盒子不符、人形轻微拉伸且点击→部位坐标系错位）。
+    // 布局在首帧已稳定，故在第一帧重新测量一次，使 W/H/cx/cy 对齐真实画布。
     const loop = (now) => {
       if (!this.running) return;
+      this._resize();
       const dt = Math.min(0.05, (now - this._last) / 1000);
       this._last = now;
       this._update(dt);
