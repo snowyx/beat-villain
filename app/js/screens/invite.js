@@ -20,6 +20,15 @@ export function initInvite(app) {
   }
 }
 
+// 成员在线态就地刷新：member_change 到达时，invite 屏 key/子视图不变，
+// renderRoute 的挂载守卫会提前 return、不重建屏，导致成员行停留在旧态
+// （神婆进房后苦主仍显示「神婆 ➖」）。故由 main.js 在 invite 屏已挂载时
+// 直接调用本函数，只重绘 #members 一处，不重建整屏（保留二维码/输入态）。
+export function refreshInviteMembers(app) {
+  const box = document.querySelector('#screen-invite #members');
+  if (box) renderMembers(app, box);
+}
+
 function inviteLink(roomCode) {
   const base = `${location.origin}${location.pathname}`;
   return `${base}#/join?room=${roomCode}`;

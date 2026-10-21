@@ -7,7 +7,7 @@ import { Store } from './store.js';
 import { unlockAudio } from './audio.js';
 
 import { initAltar } from './screens/altar.js';
-import { initInvite } from './screens/invite.js';
+import { initInvite, refreshInviteMembers } from './screens/invite.js';
 import { initSpell, teardownSpell } from './screens/spell.js';
 import { initBeat, teardownBeat } from './screens/beat.js';
 import { initAsh, teardownAsh } from './screens/ash.js';
@@ -159,6 +159,9 @@ function wireWs() {
   ws.on('member_change', (d) => {
     store.setMembers(d.members);
     renderRoute();
+    // invite 屏 key/子视图不变时 renderRoute 守卫会提前 return、不重建屏，
+    // 成员行不会刷新；此处就地重绘 #members，使神婆进房后苦主侧即时显示其在线。
+    if (app.current === 'invite') refreshInviteMembers(app);
   });
 
   ws.on('hit', (d) => {
