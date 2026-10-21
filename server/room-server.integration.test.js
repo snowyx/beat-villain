@@ -103,11 +103,17 @@ test('集成：双客户端全链路 hello→建房→进房→切咒语→打�
   assert.equal(created.data.role, 'victim');
   assert.equal(snapOf(created).phase, 'altar');
 
-  // 神婆进房
+  // 神婆进房：锁死后端进房契约（FEAT-001 步骤2）——
+  // 防止将来误改后端把「神婆进坛卡住」问题甩回前端。
   shaman.send('join_room', { roomCode });
   const joined = await shaman.waitFor('room_joined');
   assert.equal(joined.data.role, 'shaman');
-  assert.equal(snapOf(joined).members.length, 2);
+  const joinedSnap = snapOf(joined);
+  assert.equal(joinedSnap.phase, 'altar', '进房快照 phase 应为 altar');
+  assert.equal(joinedSnap.members.length, 2, '进房后房内应有苦主+神婆两人');
+  const shamanSelf = joinedSnap.members.find((m) => m.isSelf);
+  assert.ok(shamanSelf, '进房快照应含 isSelf 成员项');
+  assert.equal(shamanSelf.role, 'shaman', '神婆自身成员项 role 应为 shaman');
   // 苦主收到 member_change
   const vMember = await victim.waitFor('member_change');
   assert.equal(vMember.data.count, 2);
