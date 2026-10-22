@@ -18,6 +18,24 @@ export class WsClient {
     this._helloAcked = false;
     this._manualClose = false;
     this._queue = []; // hello_ok 之前排队的业务消息
+    this._heartbeatTimer = null; // 定时 ping 心跳保活
+  }
+
+  // 约 20s 周期 ping 保活，避免空闲连接被后台标签/代理/NAT 静默断开。
+  _startHeartbeat() {
+    this._clearHeartbeat();
+    this._heartbeatTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN && this._helloAcked) {
+        this._raw({ type: 'ping', data: {} });
+      }
+    }, 20000);
+  }
+
+  _clearHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
   }
 
   get clientId() {
@@ -85,12 +103,15 @@ export class WsClient {
         const q = this._queue;
         this._queue = [];
         for (const frame of q) this._raw(frame);
+        // hello 确认即开始保活（含重连后）
+        this._startHeartbeat();
       }
 
       this._dispatch(type, data);
     });
 
     this.ws.addEventListener('close', () => {
+      this._clearHeartbeat();
       this._helloAcked = false;
       this._dispatch('_disconnected', {});
       if (!this._manualClose) this._scheduleReconnect();
@@ -134,6 +155,7 @@ export class WsClient {
 
   close() {
     this._manualClose = true;
+    this._clearHeartbeat();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;

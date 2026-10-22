@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "BUG1：神婆点「进坛代打」报 ROOM_NOT_FOUND。根因在前端——app/js/ws-client.js 从不发任何 ping，苦主 create_room 后停在邀请屏（改 host-override/复制链接/看二维码）期间连接零数据往来，浏览器后台标签/代理/NAT 在 ~30–60s 空闲后静默断开 WebSocket；苦主是房间唯一在线成员，断开后后端 handleClose 置 online=false 并 cleanupRoom 启动 60s(CLEANUP_DELAY_MS)删除，神婆随后 join 即 ROOM_NOT_FOUND。后端已支持 ping→pong（room-server.js routeMessage 的 case 'ping'）。修法：在 WsClient 加定时 ping 心跳保活，让空闲连接不被判空闲、房间不被 cleanup。此 FEAT 与 FEAT-002 相互独立（改不同文件）。",
+  "status": "completed",
+  "steps": [
+    "编辑 app/js/ws-client.js：在 WsClient 构造函数新增字段 this._heartbeatTimer = null。",
+    "新增私有方法 _startHeartbeat()：若已存在定时器先清除；用 setInterval 约 20000ms（小于常见 30–60s 空闲阈值）周期性检查 this.ws && this.ws.readyState===WebSocket.OPEN && this._helloAcked，满足则 this._raw({ type: 'ping', data: {} })（用 _raw 直发，绕过 send() 的 hello 前排队逻辑，避免把 ping 排进 _queue）。",
+    "新增私有方法 _clearHeartbeat()：若 this._heartbeatTimer 存在则 clearInterval 并置 null。",
+    "在 message 处理里收到 hello_ok（现有 if (type === 'hello_ok') 分支内，flush _queue 之后）调用 this._startHeartbeat()，使每次（含重连后）hello 确认即开始保活。",
+    "在 _open 的 close 事件回调开头调用 this._clearHeartbeat()（断线即停表，重连成功后由 hello_ok 重启）。",
+    "在 close() 手动关闭方法里也调用 this._clearHeartbeat()，确保手动关闭不残留定时器。",
+    "不改任何业务帧、不改后端、不改首帧契约与重连逻辑；仅新增心跳相关代码。"
+  ],
+  "acceptance_criteria": [
+    "运行 node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js 全部通过（现有前端单测不回归）。",
+    "运行 cd server && npm test 仍 18/18 通过（未改后端）。",
+    "端到端：苦主 create_room 后停留 ≥70s（跨过 60s cleanup 窗口）不发业务帧，仅靠心跳；随后神婆用该 roomCode join_room 返回 room_joined（members=2），不报 ROOM_NOT_FOUND。",
+    "心跳期间后端不触发 cleanup：该 roomCode 仍存在于后端 rooms（或神婆能成功进房即证明）。"
+  ],
+  "verification": [
+    "cd server && npm test  → 期望 18/18 绿",
+    "在仓库根：node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js  → 期望全绿",
+    "端到端脚本（临时，验证后删除）：用 server/node_modules 的 ws 连 ws://localhost:8080。客户端A：发 hello→收 hello_ok→发 create_room→捕获 roomCode；保持连接并每 ~20s 收发（或直接依赖被测前端行为，用两个浏览器标签走真实 UI 亦可），挂机 ≥70s。客户端B：发 hello→收 hello_ok→发 join_room{roomCode,role:'shaman'}→断言收到 room_joined 且 members 长度为 2，而非 error ROOM_NOT_FOUND。",
+    "可选对照：临时禁用心跳重跑同脚本应复现 ROOM_NOT_FOUND，以确认心跳为根因修复；跑完删除临时脚本。"
+  ],
+  "blocked_reason": null,
+  "findings": "仅改 app/js/ws-client.js（未触碰后端/其他前端文件）。新增：构造函数字段 this._heartbeatTimer=null；私有方法 _startHeartbeat()（先 _clearHeartbeat 再 setInterval 20000ms，回调检查 ws.readyState===OPEN && _helloAcked 后经 _raw 直发 {type:'ping',data:{}} 绕过 _queue 排队）与 _clearHeartbeat()（clearInterval 置 null）。接入点：hello_ok 分支 flush _queue 后调用 _startHeartbeat()（含重连后 hello 确认即重启保活）；close 事件回调开头调用 _clearHeartbeat()；手动 close() 方法内调用 _clearHeartbeat()。未改业务帧、首帧契约 hello→hello_ok、重连逻辑。验证：cd server && npm test → 18/18 绿（后端未改）；仓库根 node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js → 17/17 全绿。现有前端单测无覆盖心跳（均为无 DOM 纯函数测试，WsClient 无单测），端到端挂机≥70s 场景未在本步自动化运行。后续若需验证心跳根因修复，可用 context.json 第3点的 Node ws 客户端脚本挂机验证。与 FEAT-002（改 theme.css / 不同文件）相互独立，无冲突。"
+}
