@@ -170,7 +170,7 @@ test('集成：双客户端全链路 hello→建房→进房→切咒语→打�
   await reconnected.close();
 });
 
-test('集成：fortune 后 reset 重开一坛，成员/花名/罪状保留，进度归零', async (t) => {
+test('集成：fortune 后 reset 清空小人身份进入待重新立牌态，成员/房间码保留、进度归零', async (t) => {
   const { wss, port } = await startTestServer();
   const url = `ws://127.0.0.1:${port}`;
   t.after(() => new Promise((res) => wss.close(res)));
@@ -202,7 +202,7 @@ test('集成：fortune 后 reset 重开一坛，成员/花名/罪状保留，进
   for (let i = 0; i < 18; i++) victim.send('hit', { roomCode });
   await Promise.all([vFortune, sFortune]);
 
-  // 重开一坛：两端各收一帧 room_state，进度归零、成员/花名/罪状/房间码保留
+  // 重开一坛：两端各收一帧 room_state，进度归零、花名/罪状清空、成员/房间码保留
   victim.send('reset', { roomCode });
   const vReset = await victim.waitFor('room_state');
   const sReset = await shaman.waitFor('room_state');
@@ -217,9 +217,152 @@ test('集成：fortune 后 reset 重开一坛，成员/花名/罪状保留，进
     assert.equal(snap.lang, null);
     assert.equal(snap.members.length, 2);
     assert.equal(snap.roomCode, roomCode);
-    assert.equal(snap.flower, '卷王本卷');
-    assert.deepEqual(snap.crimes, ['抢功劳', '甩锅侠']);
+    assert.equal(snap.flower, '', 'reset 后花名清空（待重新立牌）');
+    assert.deepEqual(snap.crimes, [], 'reset 后罪状清空');
   }
+
+  await victim.close();
+  await shaman.close();
+});
+
+test('集成：reset 后 relist 重新立牌，神婆同步看到新小人、房间码/成员不变，后续流程可继续', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const victim = new Client(url);
+  const shaman = new Client(url);
+
+  await victim.hello();
+  await shaman.hello();
+
+  victim.send('create_room', { flower: '卷王本卷', crimes: ['抢功劳'] });
+  const created = await victim.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+
+  shaman.send('join_room', { roomCode });
+  await shaman.waitFor('room_joined');
+  await victim.waitFor('member_change');
+
+  shaman.send('set_lang', { roomCode, lang: 'zh-HK' });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  victim.send('start_beat', { roomCode });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  const vFortune = victim.waitFor('fortune');
+  const sFortune = shaman.waitFor('fortune');
+  for (let i = 0; i < 18; i++) victim.send('hit', { roomCode });
+  await Promise.all([vFortune, sFortune]);
+
+  // reset 进入待重新立牌态
+  victim.send('reset', { roomCode });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  // 苦主重新立牌：提交全新小人身份
+  victim.send('relist', { roomCode, flower: '新花名', crimes: ['摸鱼'] });
+  const vRelist = await victim.waitFor('room_state');
+  const sRelist = await shaman.waitFor('room_state');
+  const vs = snapOf(vRelist);
+  const ss = snapOf(sRelist);
+
+  for (const snap of [vs, ss]) {
+    assert.equal(snap.phase, 'altar', 'relist 后 phase 维持 altar');
+    assert.equal(snap.flower, '新花名', '两端同步看到新花名');
+    assert.deepEqual(snap.crimes, ['摸鱼'], '两端同步看到新罪状');
+    assert.equal(snap.hits, 0);
+    assert.equal(snap.members.length, 2, '成员保留');
+    assert.equal(snap.roomCode, roomCode, '房间码不变');
+  }
+
+  // 后续流程可继续：苦主 set_lang 推进 chanting
+  victim.send('set_lang', { roomCode, lang: 'zh-CN' });
+  const vLang = await victim.waitFor('room_state');
+  const sLang = await shaman.waitFor('room_state');
+  assert.equal(snapOf(vLang).phase, 'chanting');
+  assert.equal(snapOf(sLang).phase, 'chanting');
+
+  await victim.close();
+  await shaman.close();
+});
+
+test('集成：relist 在非待立牌态被静默拒绝（只回一帧 room_state、flower 不变，不下发 error）', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const victim = new Client(url);
+  await victim.hello();
+
+  // 刚建房：flower 非空的 altar（非「待重新立牌」态）
+  victim.send('create_room', { flower: '甩锅侠', crimes: ['抢功劳'] });
+  const created = await victim.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+  assert.equal(snapOf(created).phase, 'altar');
+
+  // 此时 flower 非空，relist 应被静默拒绝：只回一帧 room_state、flower 不变
+  victim.send('relist', { roomCode, flower: '新花名', crimes: ['摸鱼'] });
+  const state = await victim.waitFor('room_state');
+  assert.equal(snapOf(state).flower, '甩锅侠', 'relist 非待立牌态不更新 flower');
+  assert.equal(snapOf(state).phase, 'altar');
+
+  await assert.rejects(
+    victim.waitFor('error', 300),
+    /timeout waiting for error/,
+    'relist 非法阶段不得下发 error 帧',
+  );
+
+  await victim.close();
+});
+
+test('集成：relist 由非苦主（神婆）发起被静默拒绝、flower 不变', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const victim = new Client(url);
+  const shaman = new Client(url);
+  await victim.hello();
+  await shaman.hello();
+
+  victim.send('create_room', { flower: '卷王本卷', crimes: ['抢功劳'] });
+  const created = await victim.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+
+  shaman.send('join_room', { roomCode });
+  await shaman.waitFor('room_joined');
+  await victim.waitFor('member_change');
+
+  shaman.send('set_lang', { roomCode, lang: 'zh-HK' });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  victim.send('start_beat', { roomCode });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  const vFortune = victim.waitFor('fortune');
+  const sFortune = shaman.waitFor('fortune');
+  for (let i = 0; i < 18; i++) victim.send('hit', { roomCode });
+  await Promise.all([vFortune, sFortune]);
+
+  victim.send('reset', { roomCode });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  // 神婆（非苦主）发 relist → 静默拒绝，只回一帧 room_state、flower 仍为空
+  shaman.send('relist', { roomCode, flower: '神婆乱填', crimes: ['摸鱼'] });
+  const sState = await shaman.waitFor('room_state');
+  assert.equal(snapOf(sState).flower, '', '非苦主 relist 不更新 flower');
+
+  await assert.rejects(
+    shaman.waitFor('error', 300),
+    /timeout waiting for error/,
+    'relist 越权不得下发 error 帧',
+  );
 
   await victim.close();
   await shaman.close();

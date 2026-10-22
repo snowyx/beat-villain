@@ -7,7 +7,7 @@ import { Store } from './store.js';
 import { unlockAudio } from './audio.js';
 
 import { initAltar } from './screens/altar.js';
-import { initInvite, refreshInviteMembers } from './screens/invite.js';
+import { initInvite, refreshInviteMembers, refreshShamanWaiting } from './screens/invite.js';
 import { initSpell, teardownSpell } from './screens/spell.js';
 import { initBeat, teardownBeat } from './screens/beat.js';
 import { initAsh, teardownAsh } from './screens/ash.js';
@@ -55,7 +55,12 @@ function screenForState(state) {
   if (app.pendingJoinRoom && !state.roomCode) return 'invite';
   switch (state.phase) {
     case 'altar':
-      return 'invite'; // 建房后进入邀请屏
+      // 「待重新立牌」态（reset 后 flower 清空）：苦主回开坛立牌页重打新小人；
+      // 神婆留在坛里走等待页子视图（显示「苦主正在重新立牌」）。
+      if (!state.flower) {
+        return state.role === 'shaman' ? 'invite' : 'altar';
+      }
+      return 'invite'; // 已立牌（flower 非空）：苦主邀请屏 / 神婆带小人信息等待页
     case 'chanting':
       return 'spell';
     case 'beating':
@@ -154,6 +159,12 @@ function wireWs() {
   ws.on('room_state', (d) => {
     store.applySnapshot(d.snapshot);
     renderRoute();
+    // reset→relist 过程中神婆仍停在 invite 屏 shaman-waiting 子视图，key/子视图未变，
+    // renderRoute 守卫会提前 return 不重建；此处就地重绘等待页，使「正在重新立牌」
+    // 与新小人花名/罪状能随 flower 变化即时切换。
+    if (app.current === 'invite' && store.state.role === 'shaman') {
+      refreshShamanWaiting(app);
+    }
   });
 
   ws.on('member_change', (d) => {

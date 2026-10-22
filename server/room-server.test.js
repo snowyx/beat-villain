@@ -125,9 +125,9 @@ test('enterBurning: 幂等——二次调用不改变已锁定签文', () => {
   assert.equal(room.phase, PHASES.FORTUNE);
 });
 
-// ── resetRoom: 重开一坛归零但保留成员/花名/罪状 ─────────────────────────────
+// ── resetRoom: 重开一坛清空小人身份、进入「待重新立牌」态，但保留成员/房间码 ────────
 
-test('resetRoom: 进度归零（hits/阶段/burned/fortune/lang/phase）但保留成员、花名、罪状、房间码', () => {
+test('resetRoom: 进度归零 + 清空花名/罪状进入待重新立牌态，但保留成员与房间码', () => {
   const room = createRoom('AAAAAA', { flower: '卷王本卷', crimes: ['抢功劳', '甩锅侠'] });
   room.phase = PHASES.FORTUNE;
   room.hits = 18;
@@ -140,7 +140,7 @@ test('resetRoom: 进度归零（hits/阶段/burned/fortune/lang/phase）但保�
 
   resetRoom(room);
 
-  // 进度归零
+  // 进度归零 + 回到 altar
   assert.equal(room.hits, 0);
   assert.equal(room.villainStage, VILLAIN_STAGES.SWAGGER);
   assert.equal(room.burned, false);
@@ -148,9 +148,11 @@ test('resetRoom: 进度归零（hits/阶段/burned/fortune/lang/phase）但保�
   assert.equal(room.lang, null);
   assert.equal(room.phase, PHASES.ALTAR);
 
-  // 保留小人身份与房间标识
-  assert.equal(room.flower, '卷王本卷');
-  assert.deepEqual(room.crimes, ['抢功劳', '甩锅侠']);
+  // 清空旧小人身份（「待重新立牌」态）
+  assert.equal(room.flower, '', 'reset 后花名清空');
+  assert.deepEqual(room.crimes, [], 'reset 后罪状清空');
+
+  // 保留房间标识与成员（不换房间码、不踢人）
   assert.equal(room.code, 'AAAAAA');
   assert.equal(room.members.size, 2);
 });

@@ -261,10 +261,11 @@ export function enterBurning(room) {
 }
 
 /**
- * 重开一坛（FEAT-002）：把共享进度重置为开坛初态，但保留房间成员与小人身份。
- * 重置：hits=0、villainStage=嚣张、burned=false、fortune=null、lang=null、phase=altar。
- * 保留：room.code / flower / crimes / target / members / _cleanupTimer（不踢人、不换房间码、
- *       同一个小人继续）。仅做状态变更，广播由调用方（handleReset）负责。
+ * 重开一坛（新语义）：把房间带入「待重新立牌」态，让苦主为全新小人重新起花名选罪状。
+ * 重置：hits=0、villainStage=嚣张、burned=false、fortune=null、lang=null、phase=altar，
+ *       并额外清空 flower=''、crimes=[]（旧小人身份清空，前端据 flower 空判定「待重新立牌」）。
+ * 保留：room.code / target / members / _cleanupTimer（不踢人、不换房间码、成员保留，
+ *       神婆留在坛里看「苦主正在重新立牌」等待态）。仅做状态变更，广播由调用方（handleReset）负责。
  */
 export function resetRoom(room) {
   room.hits = 0;
@@ -273,6 +274,8 @@ export function resetRoom(room) {
   room.fortune = null;
   room.lang = null;
   room.phase = PHASES.ALTAR;
+  room.flower = '';
+  room.crimes = [];
   return room;
 }
 
@@ -475,6 +478,40 @@ function handleReset(ws, meta, data) {
   broadcastSnapshot(room, 'room_state');
 }
 
+/**
+ * 重新立牌（relist）：苦主在「待重新立牌」态（phase=altar 且 flower 为空）提交新的
+ * flower + crimes，更新房间小人身份并把房间推进回「已立牌」态（phase 维持 altar、flower 非空），
+ * 随后广播 room_state 让神婆同步看到新小人。
+ * 校验（任何非法情况按 PHASE_REJECTED 惯例静默回一帧 room_state 自愈，不下发 error）：
+ *   - 仅房主/苦主（meta.role === 'victim'）可发；
+ *   - 仅「待重新立牌」态（room.phase === altar 且 room.flower === ''）允许；
+ *   - data.flower 须为去空白后非空的字符串。
+ */
+function handleRelist(ws, meta, data) {
+  const room = requireRoom(ws, meta, data);
+  if (!room) return;
+  if (meta.role !== ROLES.VICTIM) {
+    console.debug('[PHASE_REJECTED] relist by non-victim role', meta.role);
+    singleSend(ws, 'room_state', { snapshot: makeSnapshot(room, meta.clientId) });
+    return;
+  }
+  if (room.phase !== PHASES.ALTAR || room.flower !== '') {
+    console.debug('[PHASE_REJECTED] relist in phase/flower', room.phase, room.flower);
+    singleSend(ws, 'room_state', { snapshot: makeSnapshot(room, meta.clientId) });
+    return;
+  }
+  const flower = data && typeof data.flower === 'string' ? data.flower.trim() : '';
+  if (flower.length < 1) {
+    console.debug('[PHASE_REJECTED] relist empty flower');
+    singleSend(ws, 'room_state', { snapshot: makeSnapshot(room, meta.clientId) });
+    return;
+  }
+  room.flower = flower;
+  room.crimes = data && Array.isArray(data.crimes) ? data.crimes : [];
+  // phase 维持 altar（花名非空即「已立牌」态，与首次 create_room 后一致），后续流程复用。
+  broadcastSnapshot(room, 'room_state');
+}
+
 function routeMessage(ws, raw) {
   let msg;
   try {
@@ -519,6 +556,9 @@ function routeMessage(ws, raw) {
       break;
     case 'reset':
       handleReset(ws, meta, data);
+      break;
+    case 'relist':
+      handleRelist(ws, meta, data);
       break;
     case 'ping':
       singleSend(ws, 'pong', {});

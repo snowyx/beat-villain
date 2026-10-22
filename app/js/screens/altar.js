@@ -16,6 +16,10 @@ const CRIMES = [
 
 export function initAltar(app) {
   const el = app.el;
+  // 已有 roomCode = 重置后重新立牌（走 relist，复用原房间/成员/房间码）；
+  // 无 roomCode = 首次开坛（走 create_room 新建房间）。
+  const hasRoom = !!app.store.state.roomCode;
+  const btnLabel = hasRoom ? '🔥 重新开坛' : '🔥 开坛';
   el.innerHTML = `
     <div class="card">
       <h1 class="neon-title">开坛立牌</h1>
@@ -35,7 +39,7 @@ export function initAltar(app) {
       </div>
 
       <div class="bottom-bar">
-        <button id="create-room" class="btn-primary" type="button" disabled>🔥 开坛</button>
+        <button id="create-room" class="btn-primary" type="button" disabled>${btnLabel}</button>
       </div>
     </div>
   `;
@@ -91,7 +95,13 @@ export function initAltar(app) {
     }
     if (selected.size < 1) return;
     createBtn.disabled = true;
-    app.ws.send('create_room', { flower, crimes: [...selected] });
+    const roomCode = app.store.state.roomCode;
+    if (roomCode) {
+      // 重置后重新立牌：在已存在房间提交新小人身份（不新建房间、不换房间码）。
+      app.ws.send('relist', { roomCode, flower, crimes: [...selected] });
+    } else {
+      app.ws.send('create_room', { flower, crimes: [...selected] });
+    }
   });
 
   validate();

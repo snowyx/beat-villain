@@ -55,15 +55,18 @@ export class Store {
     s.lang = snapshot.lang ?? null;
     s.target = snapshot.target ?? s.target;
     s.members = Array.isArray(snapshot.members) ? snapshot.members : s.members;
-    // 重开一坛回落（FEAT-002）：reset 后后端广播 phase=altar & hits=0 的快照，
+    // 重开一坛回落（reset 新语义）：reset 后后端广播 phase=altar & hits=0 的快照，
     // 这是合法的 hits 归零场景，需绕过下方 Math.max 单调递增防回退，并显式清空
-    // burned/fortune（'?? s.fortune' 对 null 会回退旧值，故在此分支显式置 null）。
+    // burned/fortune/flower/crimes（'?? s.flower' 对空串放行但本分支不走常规赋值，
+    // 故在此分支显式清空旧小人身份，使本地镜像真正进入「待重新立牌」态）。
     if (snapshot.phase === 'altar' && typeof snapshot.hits === 'number'
       && snapshot.hits === 0 && s.hits > 0) {
       s.hits = 0;
       s.villainStage = snapshot.villainStage || '嚣张';
       s.burned = false;
       s.fortune = null;
+      s.flower = snapshot.flower ?? '';
+      s.crimes = Array.isArray(snapshot.crimes) ? snapshot.crimes : [];
       if (extra.role) s.role = extra.role;
       const selfReset = (snapshot.members || []).find((m) => m.isSelf);
       if (selfReset && selfReset.role) s.role = selfReset.role;

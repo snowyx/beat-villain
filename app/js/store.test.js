@@ -20,23 +20,35 @@ test('applyHit: hits 单调递增，乱序到达不回退', () => {
   assert.equal(store.state.hits, 7);
 });
 
-test('applySnapshot reset：phase=altar & hits=0 快照让本地 hits 真正归 0、签文清空', () => {
+test('applySnapshot reset：phase=altar & hits=0 快照让本地 hits 归 0、签文/花名/罪状清空', () => {
   const store = new Store();
-  // 先推到满鞋化灰出签态
+  // 先带一次 flower/crimes 的快照设置旧小人身份
+  store.applySnapshot({
+    roomCode: 'A7K9QX',
+    phase: 'altar',
+    hits: 0,
+    flower: '旧花名',
+    crimes: ['抢功劳'],
+    members: [],
+  });
+  // 再推到满鞋化灰出签态
   store.applyHit({ hits: 18, villainStage: '化灰' });
   store.setBurned();
   store.applyFortune({ yi: '摸鱼', ji: '背锅', guiren: '食堂阿姨' });
   assert.equal(store.state.hits, 18);
   assert.equal(store.state.burned, true);
   assert.ok(store.state.fortune);
+  assert.equal(store.state.flower, '旧花名');
 
-  // 重开一坛广播的快照：phase=altar、hits=0、burned=false、fortune=null
+  // 重开一坛广播的快照：phase=altar、hits=0、burned=false、fortune=null、flower=''、crimes=[]
   store.applySnapshot({
     roomCode: 'A7K9QX',
     phase: 'altar',
     hits: 0,
     burned: false,
     fortune: null,
+    flower: '',
+    crimes: [],
     villainStage: '嚣张',
     members: [],
   });
@@ -44,6 +56,8 @@ test('applySnapshot reset：phase=altar & hits=0 快照让本地 hits 真正归 
   assert.equal(store.state.hits, 0, 'reset 后 hits 必须真正归 0（绕过 Math.max）');
   assert.equal(store.state.burned, false);
   assert.equal(store.state.fortune, null, 'reset 后签文必须清空（不被 ?? 回退）');
+  assert.equal(store.state.flower, '', 'reset 后花名必须清空（待重新立牌）');
+  assert.deepEqual(store.state.crimes, [], 'reset 后罪状必须清空');
   assert.equal(store.state.villainStage, '嚣张');
   assert.equal(store.state.phase, 'altar');
 });
