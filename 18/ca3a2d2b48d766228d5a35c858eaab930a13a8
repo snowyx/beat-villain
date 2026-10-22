@@ -1,0 +1,28 @@
+.kiro/specs/kick-bad-guy/design.md
+  h_57a4b15c8feaaa 9,80,94-95,154-155,170,221,231,243,247-250,252,358,382
+.kiro/specs/kick-bad-guy/requirements.md
+  h_57a4b15c8feaaa 9,91,94,103,107,238,261
+.kiro/steering/民俗合规.md
+  h_57a4b15c8feaaa 37
+README.md
+  h_57a4b15c8feaaa 60,72-73
+app/js/config.js
+  h_57a4b15c8feaaa 18,20-24
+server/room-server.integration.test.js
+  h_57a4b15c8feaaa 2-3,86,136,143-144,155
+server/room-server.js
+  h_57a4b15c8feaaa 8,19,25,92,95-97,158
+server/room-server.test.js
+  h_57a4b15c8feaaa 46,48-53,60,63,80-81,85,89,119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "18ca3a2d2b48d766228d5a35c858eaab930a13a8",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
