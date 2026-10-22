@@ -170,6 +170,89 @@ test('集成：双客户端全链路 hello→建房→进房→切咒语→打�
   await reconnected.close();
 });
 
+test('集成：fortune 后 reset 重开一坛，成员/花名/罪状保留，进度归零', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const victim = new Client(url);
+  const shaman = new Client(url);
+
+  await victim.hello();
+  await shaman.hello();
+
+  victim.send('create_room', { flower: '卷王本卷', crimes: ['抢功劳', '甩锅侠'] });
+  const created = await victim.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+
+  shaman.send('join_room', { roomCode });
+  await shaman.waitFor('room_joined');
+  await victim.waitFor('member_change');
+
+  shaman.send('set_lang', { roomCode, lang: 'zh-HK' });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  victim.send('start_beat', { roomCode });
+  await victim.waitFor('room_state');
+  await shaman.waitFor('room_state');
+
+  const vFortune = victim.waitFor('fortune');
+  const sFortune = shaman.waitFor('fortune');
+  for (let i = 0; i < 18; i++) victim.send('hit', { roomCode });
+  await Promise.all([vFortune, sFortune]);
+
+  // 重开一坛：两端各收一帧 room_state，进度归零、成员/花名/罪状/房间码保留
+  victim.send('reset', { roomCode });
+  const vReset = await victim.waitFor('room_state');
+  const sReset = await shaman.waitFor('room_state');
+  const vs = snapOf(vReset);
+  const ss = snapOf(sReset);
+
+  for (const snap of [vs, ss]) {
+    assert.equal(snap.phase, 'altar');
+    assert.equal(snap.hits, 0);
+    assert.equal(snap.burned, false);
+    assert.equal(snap.fortune, null);
+    assert.equal(snap.lang, null);
+    assert.equal(snap.members.length, 2);
+    assert.equal(snap.roomCode, roomCode);
+    assert.equal(snap.flower, '卷王本卷');
+    assert.deepEqual(snap.crimes, ['抢功劳', '甩锅侠']);
+  }
+
+  await victim.close();
+  await shaman.close();
+});
+
+test('集成：非法阶段 reset 被静默拒绝（只回一帧 room_state，不下发 error）', async (t) => {
+  const { wss, port } = await startTestServer();
+  const url = `ws://127.0.0.1:${port}`;
+  t.after(() => new Promise((res) => wss.close(res)));
+
+  const victim = new Client(url);
+  await victim.hello();
+
+  victim.send('create_room', { flower: '甩锅侠', crimes: [] });
+  const created = await victim.waitFor('room_created');
+  const roomCode = created.data.roomCode;
+  assert.equal(snapOf(created).phase, 'altar');
+
+  // altar 阶段直接 reset → 静默回一帧 room_state 自愈、phase 仍 altar
+  victim.send('reset', { roomCode });
+  const state = await victim.waitFor('room_state');
+  assert.equal(snapOf(state).phase, 'altar');
+
+  // 不应收到 error 帧（短超时内 waitFor('error') 应 reject）
+  await assert.rejects(
+    victim.waitFor('error', 300),
+    /timeout waiting for error/,
+    'reset 非法阶段不得下发 error 帧',
+  );
+
+  await victim.close();
+});
+
 test('集成：第三连接进房被 ROOM_FULL 拒；set_lang 对不存在房间回 ROOM_NOT_FOUND', async (t) => {
   const { wss, port } = await startTestServer();
   const url = `ws://127.0.0.1:${port}`;

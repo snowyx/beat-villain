@@ -260,6 +260,22 @@ export function enterBurning(room) {
   broadcast(room, 'fortune', { ...room.fortune });
 }
 
+/**
+ * 重开一坛（FEAT-002）：把共享进度重置为开坛初态，但保留房间成员与小人身份。
+ * 重置：hits=0、villainStage=嚣张、burned=false、fortune=null、lang=null、phase=altar。
+ * 保留：room.code / flower / crimes / target / members / _cleanupTimer（不踢人、不换房间码、
+ *       同一个小人继续）。仅做状态变更，广播由调用方（handleReset）负责。
+ */
+export function resetRoom(room) {
+  room.hits = 0;
+  room.villainStage = VILLAIN_STAGES.SWAGGER;
+  room.burned = false;
+  room.fortune = null;
+  room.lang = null;
+  room.phase = PHASES.ALTAR;
+  return room;
+}
+
 /** 在线成员为 0 时，延时 CLEANUP_DELAY_MS 后若仍空则回收房间。 */
 function cleanupRoom(room) {
   const anyOnline = [...room.members.values()].some((m) => m.online);
@@ -446,6 +462,19 @@ function handleHit(ws, meta, data) {
   // burn / fortune 已在 applyHit→enterBurning 内广播
 }
 
+function handleReset(ws, meta, data) {
+  const room = requireRoom(ws, meta, data);
+  if (!room) return;
+  // 仅 fortune / burning 阶段允许重开；其它阶段按 PHASE_REJECTED 惯例静默回快照自愈。
+  if (room.phase !== PHASES.FORTUNE && room.phase !== PHASES.BURNING) {
+    console.debug('[PHASE_REJECTED] reset in phase', room.phase);
+    singleSend(ws, 'room_state', { snapshot: makeSnapshot(room, meta.clientId) });
+    return;
+  }
+  resetRoom(room);
+  broadcastSnapshot(room, 'room_state');
+}
+
 function routeMessage(ws, raw) {
   let msg;
   try {
@@ -487,6 +516,9 @@ function routeMessage(ws, raw) {
       break;
     case 'hit':
       handleHit(ws, meta, data);
+      break;
+    case 'reset':
+      handleReset(ws, meta, data);
       break;
     case 'ping':
       singleSend(ws, 'pong', {});

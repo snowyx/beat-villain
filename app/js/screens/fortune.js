@@ -22,9 +22,18 @@ export function initFortune(app) {
 
       <div class="bottom-bar">
         <button id="share-btn" class="btn-primary" type="button">🧧 生成转运符分享图</button>
+        <button id="reset-btn" class="btn-ghost" type="button">🔄 再请一位小人</button>
       </div>
     </div>
   `;
+
+  el.querySelector('#reset-btn').addEventListener('click', () => {
+    const btn = el.querySelector('#reset-btn');
+    btn.disabled = true;
+    // 重开一坛：后端重置后广播 room_state（phase=altar），main.js 现有 room_state
+    // 处理会 applySnapshot→renderRoute 自动切回邀请/开坛屏，本屏无需手动切屏。
+    app.ws.send('reset', { roomCode: app.store.state.roomCode });
+  });
 
   el.querySelector('#share-btn').addEventListener('click', async () => {
     const btn = el.querySelector('#share-btn');

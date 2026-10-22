@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "打小人结束（fortune）后新增「重置/再来一局」，前后端+design+测试一起改，独立于 FEAT-001。新增 C2S 消息 reset{roomCode}：仅在 fortune 或 burning 阶段允许，重置 hits=0、villainStage=嚣张(SWAGGER)、burned=false、fortune=null、lang=null、phase=ALTAR；保留房间成员（不踢人、不换房间码）与 flower/crimes（同一个小人继续），重置后 broadcastSnapshot(room,'room_state') 广播全房。非法阶段按既有 PHASE_REJECTED 惯例静默回快照自愈、不下发 error。前端签文屏加「再请一位小人/重开一坛」按钮发 reset；关键：store.applySnapshot 的 hits 用 Math.max 单调递增防回退，reset 是合法的 hits 回 0 场景，必须特殊处理让 hits 真正归 0。回到 ALTAR 复用现有 phase 路由把两端带回邀请/开坛屏，单人与双人都能重开。",
+  "status": "completed",
+  "steps": [
+    "后端 server/room-server.js：新增并 export 函数 resetRoom(room)，设置 room.hits=0; room.villainStage=VILLAIN_STAGES.SWAGGER; room.burned=false; room.fortune=null; room.lang=null; room.phase=PHASES.ALTAR;（不动 room.code/flower/crimes/target/members/_cleanupTimer）。",
+    "后端 server/room-server.js：新增 handleReset(ws, meta, data)：const room = requireRoom(ws, meta, data); if (!room) return; 若 room.phase 不在 { PHASES.FORTUNE, PHASES.BURNING } → console.debug('[PHASE_REJECTED] reset in phase', room.phase) 并 singleSend(ws,'room_state',{ snapshot: makeSnapshot(room, meta.clientId) }) 后 return；否则 resetRoom(room) 后 broadcastSnapshot(room, 'room_state')。",
+    "后端 server/room-server.js：在 routeMessage 的 switch(type) 内（case 'ping' 之前）加 case 'reset': handleReset(ws, meta, data); break;。",
+    "后端单测 server/room-server.test.js：import { resetRoom } 并新增用例——构造 room（createRoom）后设 phase=PHASES.FORTUNE、hits=18、burned=true、fortune={yi,ji,guiren}、lang='zh-HK'、members 放两人，调 resetRoom(room)，断言 hits===0、villainStage===VILLAIN_STAGES.SWAGGER、burned===false、fortune===null、lang===null、phase===PHASES.ALTAR，且 room.flower/room.crimes 不变、room.code 不变、room.members.size 不变。",
+    "后端集成测试 server/room-server.integration.test.js：新增 test '集成：fortune 后 reset 重开一坛，成员/花名/罪状保留，进度归零'——复用现有 Client 封装建房→进房→set_lang→start_beat→打满18→收 fortune 后，victim.send('reset',{roomCode})，两端各 waitFor('room_state')，断言 snapshot.phase==='altar'、hits===0、burned===false、fortune===null、lang===null、members.length===2、roomCode===原 code、flower/crimes 保留。再新增 test '集成：非法阶段 reset 被静默拒绝'——建房后（phase=altar）直接 send('reset')，断言发起方收到一帧 room_state 且 phase 仍 'altar'，并用短超时（try waitFor('error', 300) 期望 reject）验证未收到 error 帧。",
+    "前端 app/js/store.js：在 applySnapshot 用 Math.max 合并 hits 之前加重开回落判断——当 snapshot.phase === 'altar' && typeof snapshot.hits === 'number' && snapshot.hits === 0 && s.hits > 0 时，令 s.hits = 0、s.villainStage = snapshot.villainStage || '嚣张'、s.burned = false、s.fortune = null（绕过 Math.max 与 '?? s.fortune' 的回退）；否则保持现有 Math.max 单调递增逻辑。另确保当 snapshot.fortune === null 时 s.fortune 被置 null（现有 '?? s.fortune' 对 null 会回退，需在重开分支显式置 null）。",
+    "前端 app/js/screens/fortune.js：在 .bottom-bar 内分享按钮旁/下新增 <button id=\"reset-btn\" class=\"btn-ghost\" type=\"button\">🔄 再请一位小人</button>；点击 handler：btn.disabled=true; app.ws.send('reset', { roomCode: app.store.state.roomCode }); 收到重置后的 room_state 由 main.js 现有 ws.on('room_state')→applySnapshot→renderRoute 自动切回邀请屏（phase=altar），本屏无需手动切屏。按钮仅用现有 .btn-ghost 四色霓虹样式。",
+    "前端单测 app/js/store.test.js（新建，node:test + import { Store } from './store.js' 相对路径需从 app/js 下运行或用绝对 import 路径）：用例 (a) 正常递增不回退——连续 applyHit({hits:3})、applyHit({hits:7}) 后 state.hits===7，再 applyHit({hits:5}) 仍 7；(b) reset 回落——applyHit({hits:18})+setBurned()+applyFortune({yi,ji,guiren}) 后 applySnapshot({roomCode:'A',phase:'altar',hits:0,burned:false,fortune:null,villainStage:'嚣张',members:[]}) → 断言 state.hits===0、state.burned===false、state.fortune===null、state.villainStage==='嚣张'。",
+    "文档 .kiro/specs/kick-bad-guy/design.md：§4.1 C2S 表格增行 reset | { roomCode } | 重开一坛（保留成员/花名/罪状，重置进度） | fortune / burning；§3 状态机补转移 fortune/burning --reset--> altar（注明保留成员与 flower/crimes、hits 归 0、lang 清空）；§4.5 说明 reset 非法阶段按 PHASE_REJECTED 静默回快照；把 §3 fortune 段 'MVP 不提供再来一局' 改为 '已提供 reset 重开一坛'。"
+  ],
+  "acceptance_criteria": [
+    "后端 reset 后广播的 room_state 快照 phase=altar、hits=0、burned=false、fortune=null、lang=null，且 members/flower/crimes/roomCode 不变。",
+    "仅 fortune/burning 阶段 reset 生效；其它阶段（如 altar）reset 只回一帧 room_state 自愈、不下发 error 帧。",
+    "cd server && npm test 全绿且用例数较基线 15 项增加（含 resetRoom 单测 + reset 全链路集成 + 非法阶段集成）。",
+    "node --test app/js/store.test.js 全绿：reset 快照能让本地 hits 真正归 0、fortune 清空，正常递增路径仍单调不回退。",
+    "签文屏出现「再请一位小人」按钮，点击后两端回到邀请/开坛屏，小人回嚣张、鞋数 0、签文清空、房间码不变、神婆仍在房；单人也可重开并跑完第二局。",
+    "design.md 协议表、状态机、错误码三处一致描述 reset；未改 compliance.js；未破坏既有功能。"
+  ],
+  "verification": [
+    "cd /Users/zhangji1641/codebase/kiro-idea/1-kickbadguy/server && npm test —— 全绿，用例数 > 15（新增 reset 单测与两条集成用例通过）。",
+    "在仓库根 node --test app/js/store.test.js —— 全绿。",
+    "node --test app/js/compliance.test.js —— 仍全绿。",
+    "手动双标签页冒烟：终端1 cd server && npm start，终端2 cd app && python3 -m http.server 5173，两标签页跑 开打18鞋→化灰→签文→点「再请一位小人」→两端回邀请/开坛屏、进度归零、房间码与成员保留→再念咒开打跑完第二局；单人（仅苦主）同样可重开。"
+  ],
+  "blocked_reason": null,
+  "findings": "已完成。后端 room-server.js 新增并 export resetRoom(room)（归零 hits/villainStage=嚣张/burned/fortune/lang、phase=altar，保留 code/flower/crimes/target/members/_cleanupTimer）+ handleReset（仅 fortune/burning 允许，否则 console.debug('[PHASE_REJECTED] reset in phase', ...) + singleSend room_state 自愈、不下发 error；合法则 resetRoom + broadcastSnapshot）+ routeMessage 的 switch 在 case 'ping' 前加 case 'reset'。后端单测新增 resetRoom 用例（断言归零字段 + 保留 flower/crimes/code/members.size）；集成测试新增两条：'fortune 后 reset 重开一坛'（跑满 18→收 fortune→reset，两端各收一帧 room_state，断言 phase=altar/hits=0/burned=false/fortune=null/lang=null/members=2/roomCode 不变/flower+crimes 保留）与 '非法阶段 reset 被静默拒绝'（altar 直接 reset，断言收一帧 room_state phase 仍 altar，且 assert.rejects(waitFor('error',300)) 验证无 error 帧）。前端 store.js applySnapshot 在 Math.max 合并 hits 前加重开回落分支：当 snapshot.phase==='altar' && snapshot.hits===0 && s.hits>0 时令 hits=0、villainStage=snapshot.villainStage||'嚣张'、burned=false、fortune=null（显式绕过 Math.max 与 '?? s.fortune' 的 null 回退），并复用 role 推断后 _emit('snapshot') 提前 return；非 reset 路径保持原单调递增。fortune.js 在 .bottom-bar 分享按钮后加 <button id=\"reset-btn\" class=\"btn-ghost\">🔄 再请一位小人</button>，点击 btn.disabled=true + app.ws.send('reset',{roomCode})，由 main.js 现有 room_state→applySnapshot→renderRoute 自动切回邀请屏。新建 app/js/store.test.js（3 用例：hits 单调不回退 / reset 快照 hits 真正归 0 且 fortune 清空 villainStage 回嚣张 / 普通快照仍 Math.max 不回退）。design.md 更新 §4.1（新增 reset C2S 行）、§3（状态机加 fortune/burning--reset-->altar 转移图与「重开一坛转移」说明，fortune 段「MVP 不提供再来一局」改为「已提供 reset 重开一坛」）、§4.5（PHASE_REJECTED 行补注 reset 非法阶段）。验证：cd server && npm test 全绿 18 项（>15 基线）；仓库根 node --test app/js/store.test.js 3 项全绿、node --test app/js/compliance.test.js 8 项全绿。未改 compliance.js；未引入新颜色（btn-ghost 为既有霓虹紫样式），守住民俗三红线与四色调色板。"
+}

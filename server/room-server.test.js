@@ -16,6 +16,7 @@ import {
   createRoom,
   isRoomFull,
   enterBurning,
+  resetRoom,
   VILLAIN_STAGES,
   PHASES,
   TARGET_HITS,
@@ -122,6 +123,36 @@ test('enterBurning: 幂等——二次调用不改变已锁定签文', () => {
   enterBurning(room);
   assert.equal(room.fortune, locked);
   assert.equal(room.phase, PHASES.FORTUNE);
+});
+
+// ── resetRoom: 重开一坛归零但保留成员/花名/罪状 ─────────────────────────────
+
+test('resetRoom: 进度归零（hits/阶段/burned/fortune/lang/phase）但保留成员、花名、罪状、房间码', () => {
+  const room = createRoom('AAAAAA', { flower: '卷王本卷', crimes: ['抢功劳', '甩锅侠'] });
+  room.phase = PHASES.FORTUNE;
+  room.hits = 18;
+  room.villainStage = VILLAIN_STAGES.ASH;
+  room.burned = true;
+  room.fortune = { yi: '摸鱼', ji: '背锅', guiren: '食堂阿姨' };
+  room.lang = 'zh-HK';
+  room.members.set('c_a', { role: 'victim', ws: {}, online: true });
+  room.members.set('c_b', { role: 'shaman', ws: {}, online: true });
+
+  resetRoom(room);
+
+  // 进度归零
+  assert.equal(room.hits, 0);
+  assert.equal(room.villainStage, VILLAIN_STAGES.SWAGGER);
+  assert.equal(room.burned, false);
+  assert.equal(room.fortune, null);
+  assert.equal(room.lang, null);
+  assert.equal(room.phase, PHASES.ALTAR);
+
+  // 保留小人身份与房间标识
+  assert.equal(room.flower, '卷王本卷');
+  assert.deepEqual(room.crimes, ['抢功劳', '甩锅侠']);
+  assert.equal(room.code, 'AAAAAA');
+  assert.equal(room.members.size, 2);
 });
 
 // ── makeSnapshot: isSelf 逐连接 + 不含 ws 句柄 ──────────────────────────────

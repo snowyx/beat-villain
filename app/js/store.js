@@ -54,9 +54,24 @@ export class Store {
     s.crimes = Array.isArray(snapshot.crimes) ? snapshot.crimes : s.crimes;
     s.lang = snapshot.lang ?? null;
     s.target = snapshot.target ?? s.target;
+    s.members = Array.isArray(snapshot.members) ? snapshot.members : s.members;
+    // 重开一坛回落（FEAT-002）：reset 后后端广播 phase=altar & hits=0 的快照，
+    // 这是合法的 hits 归零场景，需绕过下方 Math.max 单调递增防回退，并显式清空
+    // burned/fortune（'?? s.fortune' 对 null 会回退旧值，故在此分支显式置 null）。
+    if (snapshot.phase === 'altar' && typeof snapshot.hits === 'number'
+      && snapshot.hits === 0 && s.hits > 0) {
+      s.hits = 0;
+      s.villainStage = snapshot.villainStage || '嚣张';
+      s.burned = false;
+      s.fortune = null;
+      if (extra.role) s.role = extra.role;
+      const selfReset = (snapshot.members || []).find((m) => m.isSelf);
+      if (selfReset && selfReset.role) s.role = selfReset.role;
+      this._emit('snapshot');
+      return;
+    }
     s.burned = !!snapshot.burned;
     s.fortune = snapshot.fortune ?? s.fortune;
-    s.members = Array.isArray(snapshot.members) ? snapshot.members : s.members;
     // hits 单调递增
     if (typeof snapshot.hits === 'number') s.hits = Math.max(s.hits, snapshot.hits);
     // villainStage 结构帧也更新（但以阶段阈值对齐权威 hits）

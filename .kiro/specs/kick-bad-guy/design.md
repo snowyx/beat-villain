@@ -85,7 +85,14 @@
                            ▼                                                │
                         fortune  ◀──────────────────────────────────────────┘
                  (后端抽签一次并锁定，广播 fortune；可重复请求分享图，签文不变)
+                           │ 任一成员 reset（fortune / burning 阶段均可）
+                           ▼
+                        altar
+                 (重开一坛：保留成员与 flower/crimes，hits 归 0、lang 清空、
+                  burned=false、fortune=null，广播 room_state 带回邀请/开坛屏)
 ```
+
+**重开一坛转移（FEAT-002）**：`fortune` 或 `burning` 阶段任一成员发 `reset` → 后端把共享进度重置为开坛初态并 `phase=altar`，**保留房间成员（不踢人、不换房间码）与 `flower`/`crimes`（同一个小人继续）**，随后广播 `room_state` 带全房回邀请/开坛屏。具体重置：`hits=0`、`villainStage=嚣张`、`burned=false`、`fortune=null`、`lang=null`、`phase=altar`。非 `fortune`/`burning` 阶段收到 `reset` 按 `PHASE_REJECTED` 惯例静默回一帧 `room_state` 自愈、不下发 `error`（见 §4.5）。单人（仅苦主）与双人均可重开并跑完下一局。
 
 各状态语义与转移规则：
 
@@ -93,7 +100,7 @@
 - **chanting（念咒）**：已进入念咒界面，可反复切换三语语言、反复播放开打令。`set_lang` 在此态或 `altar` 态均允许，后端把 `lang` 同步全房。任一成员点「开打」→ `beating`。为避免误触回退，`chanting` 不允许回到 `altar`。
 - **beating（开打）**：接受 `hit` 事件，后端对 `hits` 累加（权威），据 `hits/18` 推进 `villainStage`。达到 18 自动 → `burning`。此态忽略 `set_lang`（咒语已定）。
 - **burning（化灰）**：后端在 `hits` 首次达到 18 的那一刻把 `phase` 置为 `burning`、`burned=true`，广播 `burn` 事件；此后 **忽略一切 `hit`**（计数封顶 18，幂等）。后端在广播 `burn` 后进入 `fortune`：MVP 采用「后端随 `burn` 一并抽签并把 `phase` 置为 `fortune`」，前端自行按动画时长先播化灰、再显签文，避免再引入一次服务端定时器往返。
-- **fortune（出签）**：签文在进入该态时由后端抽取并**锁定**（存入 `room.fortune`），广播 `fortune`。重连或重复请求只回同一签文；分享图在前端用该签文重复绘制，签文不变。这是终态；MVP 不提供「再来一局」（可作 P1）。
+- **fortune（出签）**：签文在进入该态时由后端抽取并**锁定**（存入 `room.fortune`），广播 `fortune`。重连或重复请求只回同一签文；分享图在前端用该签文重复绘制，签文不变。**已提供 `reset` 重开一坛**（FEAT-002）：任一成员可从此态发 `reset` 回到 `altar` 重新开始（保留成员与花名/罪状、进度归零），见本节「重开一坛转移」与 §4.1。
 
 非法转移处理：后端对与当前 `phase` 不符的客户端消息一律**静默忽略并回一帧当前权威 `room_state`**（例如 `beating` 阶段收到 `set_lang`，或 `burning/fortune` 阶段收到 `hit`），**不下发 `error` 帧、不中断连接**（归类为 `PHASE_REJECTED`，开发期仅 `console.debug`；与 §4.5 措辞一致）。这保证断线重连、双端时序错位时状态自愈。
 
@@ -119,6 +126,7 @@
 | `set_lang` | `{ roomCode, lang }` | 选/切咒语语言。`lang ∈ {"zh-CN","zh-HK","en-US"}` | altar / chanting |
 | `start_beat` | `{ roomCode }` | 从念咒进入开打 | chanting |
 | `hit` | `{ roomCode }` | 落鞋一次（抄鞋）。计数由**后端**累加，不信任客户端传计数 | beating |
+| `reset` | `{ roomCode }` | 重开一坛（保留成员/花名/罪状，重置进度 `hits=0`、`phase=altar`、`lang=null`、`fortune=null`、`burned=false`） | fortune / burning |
 | `ping` | `{}` | 保活（可选，见 §4.4） | 任意 |
 
 > 协议刻意**不接受客户端上报的落鞋计数**：`hit` 只是「我打了一下」的信号，权威 `hits` 由后端 `++`。这是满足需求 4.6「后端为权威值，避免并发不一致」的关键设计。
@@ -191,7 +199,7 @@
 | `ROOM_NOT_FOUND` | `join_room`/`set_lang`/`hit` 的 `roomCode` 不存在或已回收 | **下发 `error` 帧** → 提示「房间不存在或已散场」，神婆停留进房界面（需求 2.5） |
 | `ROOM_FULL` | `join_room` 时该房**已认领 `clientId` 的落鞋成员数（在线+离线占位）已达 2** | **下发 `error` 帧** → 提示「房间已满」，拒绝该角色加入（需求 2.7） |
 | `BAD_PAYLOAD` | 消息缺字段 / `lang` 非法 / JSON 解析失败 / `hello_ok` 前发业务消息 | **不下发面向用户的提示**；后端仅 `console.debug`，前端忽略该操作并以 `room_state` 对齐（若已有房间） |
-| `PHASE_REJECTED` | 消息与当前 `phase` 不符 | **不下发 `error` 帧**；后端仅回一帧 `room_state` 使前端自愈（开发期 `console.debug`），见 §3 非法转移 |
+| `PHASE_REJECTED` | 消息与当前 `phase` 不符（含 `reset` 在非 fortune/burning 阶段，如 altar/chanting/beating） | **不下发 `error` 帧**；后端仅回一帧 `room_state` 使前端自愈（开发期 `console.debug`），见 §3 非法转移 |
 
 **错误帧下发规则（评审发现 3、11 的处置，全文统一）**：只有 `ROOM_NOT_FOUND` 与 `ROOM_FULL` 会向客户端下发 `error` 帧并面向用户提示；`PHASE_REJECTED` 与 `BAD_PAYLOAD` 是**内部归类，不下发 `error` 帧**（开发期可在服务端 `console.debug`），只回一帧 `room_state`（若该连接已有房间归属）让前端自愈。所有错误一律**不中断 WebSocket 连接**。
 
