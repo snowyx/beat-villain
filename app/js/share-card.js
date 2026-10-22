@@ -3,6 +3,8 @@
 // 保存/分享判定顺序：navigator.canShare({files}) → a[download] → 提示长按。
 // 页脚保留合规小字。系统字体栈，无需等待 web font。
 
+import { CONFIG } from './config.js';
+
 const RED = '#E23A3A';
 const GOLD = '#F4C430';
 const PURPLE = '#A24BFF';
@@ -24,7 +26,7 @@ export function drawShareCard(data = {}) {
   const {
     flower = '小人',
     crimes = [],
-    hits = 8,
+    hits = CONFIG.TARGET_HITS,
     fortune = { yi: '', ji: '', guiren: '' },
     roomCode = '',
   } = data;

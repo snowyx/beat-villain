@@ -179,7 +179,7 @@ function wireWs() {
   });
 
   ws.on('burn', (d) => {
-    // burn 帧带权威 hits=8：合并进 store（Math.max 单调递增）确保化灰显示 8 鞋。
+    // burn 帧带权威 hits=18：合并进 store（Math.max 单调递增）确保化灰显示 18 鞋。
     if (d && typeof d.hits === 'number') store.applyHit({ hits: d.hits, villainStage: '化灰' });
     store.setBurned();
     // phase→burning/fortune 会随后续 room_state 路由；burn 增量帧本身不改 phase，
