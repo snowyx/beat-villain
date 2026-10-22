@@ -1,0 +1,14 @@
+.gitignore
+  h_57a4b15c8feaaa 7-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a3e2fce89bb94125d9b4f9f591ff44161c3721db",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
