@@ -1,6 +1,6 @@
 // canvas 2D 纸扎卡通人形（design §6 / 民俗合规 §2）。
 // 人形分头/躯干(肚子)/两条腿三区（含两条手臂），金边纸片质感，只用四色。
-// 四阶段：嚣张 0–2 / 懵逼 3–4 / 冒烟 5–7 / 化灰 8（随累计鞋数递进）。
+// 四阶段：嚣张 0–5 / 懵逼 6–10 / 冒烟 11–17 / 化灰 18（随累计鞋数递进）。
 // 每收一条 hit 广播播一次阻尼正弦整体弹跳（单实例 tween，重入 retrigger 重置相位）
 //   + 拖鞋印粒子（有上限）。
 // 部位反应（onHitPart）：打头/肚子/腿各有差异化本地呈现 + 拟声词文字粒子，
@@ -42,7 +42,7 @@ export class Villain {
     this.bounce = { active: false, t: 0, dur: 0.38, amp: 0 };
     this.shakeT = 0;
 
-    // 单实例鞋拔子挥击 tween（retrigger 重置相位，不叠加）：
+    // 单实例拖鞋挥击 tween（retrigger 重置相位，不叠加）：
     // 三段相位——快速入(0→0.55) / 命中定格(0.55→0.70) / 回弹淡出(0.70→1)。
     this.swing = { active: false, t: 0, dur: 0.26, part: 'belly', fromX: 0, fromY: 0, hitX: 0, hitY: 0, markDone: false };
 
@@ -131,7 +131,7 @@ export class Villain {
   }
 
   /**
-   * 触发一次鞋拔子挥击动画（part ∈ 'head'|'belly'|'legs'）：鞋拔子从人形侧上方
+   * 触发一次拖鞋挥击动画（part ∈ 'head'|'belly'|'legs'）：拖鞋从人形侧上方
    * 屏外快速挥下、拍到被击中部位、短暂定格后回弹淡出。retrigger 重置相位不叠加。
    * burning（化灰）阶段忽略——此时不画人形也不画挥击。
    */
@@ -279,7 +279,7 @@ export class Villain {
     }
     if (this.shakeT > 0) this.shakeT -= dt;
 
-    // 鞋拔子挥击推进：到达 dur 结束；命中定格窗首帧落一次拖鞋印（与挥击时间错开，避免遮挡）。
+    // 拖鞋挥击推进：到达 dur 结束；命中定格窗首帧落一次拖鞋印（与挥击时间错开，避免遮挡）。
     if (this.swing.active) {
       this.swing.t += dt;
       const p = this.swing.t / this.swing.dur;
@@ -372,7 +372,7 @@ export class Villain {
 
     this._drawVillain(this.cx + shakeX, this.cy + bounceY, squash);
 
-    // 鞋拔子挥击层（置于人形之上，表现「拍下去」）
+    // 拖鞋挥击层（置于人形之上，表现「用鞋底拍下去」）
     if (this.swing.active) this._drawSwing();
 
     // 烟雾
@@ -403,7 +403,7 @@ export class Villain {
   }
 
   /**
-   * 挥击三段相位 → 当前 x,y,rot,scale,alpha，再调 _drawShoehorn 绘制鞋拔子。
+   * 挥击三段相位 → 当前 x,y,rot,scale,alpha，再调 _drawSlipper 绘制拖鞋。
    * 快速入(0→0.55 ease-in，from→hit，角度 -0.9→0.15rad)：抄起快速挥下；
    * 命中定格(0.55→0.70 停在 hit 附近)：短暂停格强化「啪」；
    * 回弹(0.70→1 ease-out)：抬起 + 缩放淡出弹回。
@@ -440,17 +440,19 @@ export class Villain {
       scale = 1.15 - 0.35 * e;
       alpha = 1 - e;
     }
-    this._drawShoehorn(x, y, rot, scale, Math.max(0, alpha), impact);
+    this._drawSlipper(x, y, rot, scale, Math.max(0, alpha), impact);
   }
 
   /**
-   * 鞋拔子：细长弯柄 + 勺形头，金边描边、米黄纸面、柄端红点缀；一眼可认。
-   * 命中定格 impact>0 时叠一圈金/紫冲击短弧 + 星点强化「啪」的力度感。只用四色。
+   * 港式经典红白蓝胶拖鞋 / 人字拖：明确的鞋底轮廓（前宽后窄的胶囊鞋底）+ Y 字人字带，
+   * 一眼可辨。金边描边、米黄纸面（代白），红/紫条纹暗示「红白蓝」配色；只用四色。
+   * 挥击时鞋底平面朝向命中点（小人），像用鞋底拍下去。
+   * 命中定格 impact>0 时叠一圈金/紫冲击短弧 + 星点强化「啪」的力度感。
    */
-  _drawShoehorn(x, y, rot, scale, alpha, impact) {
+  _drawSlipper(x, y, rot, scale, alpha, impact) {
     const ctx = this.ctx;
 
-    // 命中冲击：在命中点先画金/紫短弧与星点（在鞋拔子之下，围绕命中点）。
+    // 命中冲击：在命中点先画金/紫短弧与星点（在拖鞋之下，围绕命中点）。
     if (impact > 0) {
       ctx.save();
       ctx.translate(x, y + 6);
@@ -477,45 +479,86 @@ export class Villain {
     ctx.translate(x, y);
     ctx.rotate(rot);
     ctx.scale(scale, scale);
-    // 鞋拔子沿「柄朝右上、勺头朝左下（命中点）」布局：局部原点在勺头。
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // 细长弯柄（从勺头向右上延伸，略弯）
+    // 局部坐标约定（与挥击 tween 对齐）：原点在命中端（鞋头/夹趾点），
+    // 鞋底朝左下拍向小人、鞋身向右上延伸。鞋底平面即「拍下去」的那一面。
+    // 鞋底沿一条略斜的长轴布局：鞋头在 (−4,8)，鞋跟在 (52,−30)。
+    const toeX = -4, toeY = 8;    // 鞋头（命中端，前端较宽）
+    const heelX = 52, heelY = -30; // 鞋跟（后端较窄）
+
+    // ── 鞋底轮廓：前宽后窄的胶囊形（明确的拖鞋鞋底）──
+    ctx.save();
+    ctx.translate(toeX, toeY);
+    ctx.rotate(Math.atan2(heelY - toeY, heelX - toeX)); // 对齐鞋头→鞋跟长轴
+    const soleLen = Math.hypot(heelX - toeX, heelY - toeY);
     ctx.fillStyle = PAPER;
     ctx.beginPath();
-    ctx.moveTo(2, -2);
-    ctx.quadraticCurveTo(34, -10, 56, -30);
-    ctx.quadraticCurveTo(60, -33, 58, -37);
-    ctx.quadraticCurveTo(56, -40, 52, -37);
-    ctx.quadraticCurveTo(30, -18, 0, -10);
+    // 前端宽半圆（鞋头）→ 两侧直收 → 后端窄半圆（鞋跟）
+    ctx.moveTo(0, -13);
+    ctx.quadraticCurveTo(-10, -13, -10, 0);     // 鞋头外侧圆角
+    ctx.quadraticCurveTo(-10, 13, 0, 13);
+    ctx.lineTo(soleLen * 0.72, 9);               // 鞋腰向鞋跟收窄
+    ctx.quadraticCurveTo(soleLen, 8, soleLen, 0);
+    ctx.quadraticCurveTo(soleLen, -8, soleLen * 0.72, -9);
+    ctx.lineTo(0, -13);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // 勺形头（舀鞋跟的弧形勺面）
-    ctx.fillStyle = PAPER;
-    ctx.beginPath();
-    ctx.ellipse(-6, 4, 14, 9, -0.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    // 勺内凹影（纸纹红，极淡；非血）
+    // 鞋底边缘「红白蓝胶拖」暗示条纹：沿鞋底内缘叠一条红、一条紫细边（白=纸面米黄）。
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(-6, 4, 14, 9, -0.5, 0, Math.PI * 2);
+    ctx.moveTo(0, -13);
+    ctx.quadraticCurveTo(-10, -13, -10, 0);
+    ctx.quadraticCurveTo(-10, 13, 0, 13);
+    ctx.lineTo(soleLen * 0.72, 9);
+    ctx.quadraticCurveTo(soleLen, 8, soleLen, 0);
+    ctx.quadraticCurveTo(soleLen, -8, soleLen * 0.72, -9);
+    ctx.lineTo(0, -13);
+    ctx.closePath();
     ctx.clip();
-    ctx.strokeStyle = 'rgba(226,58,58,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(-6, 4, 9, 5, -0.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = RED;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-6, 9); ctx.lineTo(soleLen, 5); ctx.stroke();
+    ctx.strokeStyle = PURPLE;
+    ctx.beginPath(); ctx.moveTo(-6, -9); ctx.lineTo(soleLen, -5); ctx.stroke();
     ctx.restore();
 
-    // 柄端红点缀（挂绳孔）
+    // ── 人字带（Y 字夹趾带）：从鞋头夹趾点向鞋跟两侧分出两条带 ──
+    const pivotX = soleLen * 0.22; // 夹趾点（鞋头偏前）
     ctx.fillStyle = RED;
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 2.5;
+    // 带 1：夹趾点 → 鞋身一侧
     ctx.beginPath();
-    ctx.arc(56, -34, 3, 0, Math.PI * 2);
+    ctx.moveTo(pivotX - 3, -2);
+    ctx.quadraticCurveTo(soleLen * 0.5, -9, soleLen * 0.6, -8);
+    ctx.lineTo(soleLen * 0.6, -4);
+    ctx.quadraticCurveTo(soleLen * 0.5, -4, pivotX, 2);
+    ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+    // 带 2：夹趾点 → 鞋身另一侧
+    ctx.beginPath();
+    ctx.moveTo(pivotX - 3, 2);
+    ctx.quadraticCurveTo(soleLen * 0.5, 9, soleLen * 0.6, 8);
+    ctx.lineTo(soleLen * 0.6, 4);
+    ctx.quadraticCurveTo(soleLen * 0.5, 4, pivotX, -2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // 夹趾钉（人字拖标志性的前端夹趾点）
+    ctx.fillStyle = PURPLE;
+    ctx.beginPath();
+    ctx.arc(pivotX - 2, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore(); // 撤销鞋底长轴旋转
 
     ctx.restore();
     ctx.globalAlpha = 1;
