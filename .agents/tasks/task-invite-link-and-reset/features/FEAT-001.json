@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "修正复制给神婆的邀请链接：localhost 场景复制出的链接内网同事打不开（localhost 指向对方自己机器）。与 config.js 按主机名自动推导 WS 地址的口径一致——让邀请链接也是别人能访问到的地址。纯前端改动，独立于 FEAT-002。根因在 app/js/screens/invite.js 的 inviteLink(roomCode) 用 location.origin+pathname 生成。方案：非 localhost/127.0.0.1 主机直接用 location.origin+pathname（现状即正确）；localhost/127.0.0.1 场景新增可编辑「主机地址」输入框（默认 location.host）+ 明确提示把 localhost 换成内网 IP，复制按钮与二维码都用用户修正后的 host 拼链接，绝不默默复制对方用不了的 localhost 链接。单机自测（localhost 两标签页）仍可用。",
+  "status": "completed",
+  "steps": [
+    "在 app/js/screens/invite.js 把 inviteLink(roomCode) 改为 inviteLink(roomCode, hostOverride)：传入 hostOverride（形如 '10.1.2.3:5173'）时返回 `${location.protocol}//${hostOverride}${location.pathname}#/join?room=${roomCode}`；否则返回 `${location.origin}${location.pathname}#/join?room=${roomCode}`（现状行为）。新增 isLocalHost()：location.hostname === 'localhost' || location.hostname === '127.0.0.1'。为可单测，export inviteLink 与一个可注入 location 的实现（或把拼链接纯逻辑抽成可传 { protocol, origin, pathname, hostname } 的辅助并 export）。",
+    "在 renderVictimInvite 内：当 isLocalHost() 为真时，在 .invite-actions 上方插入 <input id=\"host-override\" class=\"host-override\"> 默认值 location.host，并在其下用现有 .hint 样式渲染提示文案：'localhost 链接只能本机用；分享给同事请把地址里的 localhost 换成你的内网 IP（如 10.x.x.x），终端执行 ipconfig getifaddr en0 查看'。抽出 renderQr(link) 辅助复用现有 window.qrcode(0,'M').addData(link).make().renderTo(canvas,{cellSize:5,margin:3,dark:'#140A1F',light:'#F4C430'}) 逻辑。",
+    "复制按钮 #copy-link 点击时：若有 host-override 输入框则读 hostInput.value.trim() 作为 host（为空则回退 location.host），调 inviteLink(code, hostOverrideOrUndefined) 生成链接写入剪贴板，成功走 hint.className='hint ok'、失败回退把链接文本放进 hint（沿用现有 try/catch）。给 host-override 输入框绑 input 事件：值变化时用 inviteLink(code, value) 重新 renderQr，使二维码与修正后的可访问地址实时一致。",
+    "非 localhost 主机（已是 IP/域名）：不渲染输入框与提示，布局与现状一致；复制与二维码用 inviteLink(code)（无 override）即正确。",
+    "若输入框/提示需要样式，在 app/css/theme.css 追加 .host-override（宽度占满卡片、楷体栈、金边 1px var(--liu-jin-gold)、背景贴近 --ink、文字浅色、聚焦态加霓虹辉光 box-shadow），仅用四色变量，不引入新散色，不改变现有邀请屏 375px 骨相。",
+    "新建 app/js/screens/invite.test.js（node:test + node:assert/strict）：覆盖 (a) host 为具体 IP、无 override → 链接含该 IP 且 #/join?room=<code>；(b) host 为 localhost、无 override → 链接含 localhost；(c) 传 override '10.0.0.5:5173' → 链接 host 段为 10.0.0.5:5173。通过注入 location-like 对象或 stub global.location 实现无 DOM 可测。"
+  ],
+  "acceptance_criteria": [
+    "inviteLink(code, '10.0.0.5:5173') 生成的链接 host 段为 10.0.0.5:5173 且包含 #/join?room=<code>；inviteLink(code) 无 override 时等于 location.origin+pathname+'#/join?room='+code。",
+    "localhost/127.0.0.1 打开苦主邀请屏时显示可编辑主机地址输入框（默认当前 host）与把 localhost 换内网 IP 的提示；把 localhost 改成 IP 后点复制，剪贴板链接与二维码均指向该 IP；二维码随输入实时刷新。",
+    "用内网 IP（非 localhost）打开时不显示输入框、布局不变，复制得到的即该 IP 链接。",
+    "node --test app/js/screens/invite.test.js 全绿。",
+    "只用四色 CSS 变量，未改 app/js/compliance.js，未破坏现有邀请屏布局与神婆法事页。"
+  ],
+  "verification": [
+    "在仓库根执行 node --test app/js/screens/invite.test.js —— 全部通过。",
+    "node --test app/js/compliance.test.js —— 仍全绿（确认未误伤合规单测）。",
+    "手动冒烟：cd app && python3 -m http.server 5173，localhost 打开 → 开坛 → 邀请屏出现主机地址输入框与提示；改 IP 后复制链接与二维码一致指向该 IP；用内网 IP 打开则无输入框、复制为 IP 链接。"
+  ],
+  "blocked_reason": null,
+  "findings": "纯前端实现完成。app/js/screens/invite.js 新增并 export 三个纯函数：buildInviteLink(roomCode, hostOverride, loc=location)（可注入 location-like 对象，便于无 DOM 单测）、inviteLink(roomCode, hostOverride)（薄封装，供 renderVictimInvite 调用）、isLocalHost(loc=location)。另抽出模块内 renderQr(canvas, link, hasRoom) 复用二维码渲染（dark #140A1F / light #F4C430 不变）。renderVictimInvite 在 isLocalHost() 为真时渲染 <input id=\"host-override\" class=\"host-override\">（默认值 location.host）+ .hint 提示文案（引导把 localhost 换内网 IP，ipconfig getifaddr en0）；host-override input 事件实时用修正 host 重拼链接刷新二维码；#copy-link 读 hostInput.value.trim()（空回退 location.host）作为 override 生成链接，非 localhost 主机不渲染输入框、用 inviteLink(code) 无 override（现状行为，布局不变）。CSS 在 app/css/theme.css 的 .invite-actions 上方新增 .host-override（金边 1px var(--liu-jin-gold)、背景贴近 --ink、浅色文字、楷体 var(--kai)、聚焦态霓虹紫 box-shadow），仅用四色变量，未引入散色。新建 app/js/screens/invite.test.js（6 用例全绿）。未触碰 app/js/compliance.js，compliance.test.js 8 用例仍全绿。验证：node --test app/js/screens/invite.test.js（6/6）与 node --test app/js/compliance.test.js（8/8）均通过。注意 node 对缺失 package.json type:module 会打 MODULE_TYPELESS 警告，为既有现象（compliance.test.js 同样），不影响结果。未做后端/其他 FEAT 改动。"
+}

@@ -29,15 +29,50 @@ export function refreshInviteMembers(app) {
   if (box) renderMembers(app, box);
 }
 
-function inviteLink(roomCode) {
-  const base = `${location.origin}${location.pathname}`;
-  return `${base}#/join?room=${roomCode}`;
+// 邀请链接拼接纯逻辑：可注入 location-like 对象，便于 node:test 无 DOM 单测。
+// hostOverride（形如 '10.1.2.3:5173'）存在时用它替换 host 段，使复制/二维码
+// 指向内网同事能访问的地址；否则沿用现状 origin+pathname。
+export function buildInviteLink(roomCode, hostOverride, loc = location) {
+  if (hostOverride) {
+    return `${loc.protocol}//${hostOverride}${loc.pathname}#/join?room=${roomCode}`;
+  }
+  return `${loc.origin}${loc.pathname}#/join?room=${roomCode}`;
+}
+
+export function inviteLink(roomCode, hostOverride) {
+  return buildInviteLink(roomCode, hostOverride);
+}
+
+// localhost / 127.0.0.1 场景：复制出的链接只能本机用，需引导换内网 IP。
+export function isLocalHost(loc = location) {
+  return loc.hostname === 'localhost' || loc.hostname === '127.0.0.1';
+}
+
+// 二维码渲染（离线 vendored 库）复用逻辑：随 host-override 输入实时刷新。
+function renderQr(canvas, link, hasRoom) {
+  try {
+    if (canvas && window.qrcode && hasRoom) {
+      const qr = window.qrcode(0, 'M');
+      qr.addData(link);
+      qr.make();
+      qr.renderTo(canvas, { cellSize: 5, margin: 3, dark: '#140A1F', light: '#F4C430' });
+    }
+  } catch (e) {
+    console.debug('qr render failed', e);
+  }
 }
 
 function renderVictimInvite(app, el) {
   const s = app.store.state;
   const code = s.roomCode || '------';
-  const link = inviteLink(code);
+  const local = isLocalHost();
+  // localhost 场景：默认用当前 host 作为可编辑初值，引导换内网 IP。
+  const hostOverrideBlock = local
+    ? `
+      <input id="host-override" class="host-override" type="text" value="${escapeHtml(location.host)}" spellcheck="false" autocomplete="off">
+      <p class="hint">localhost 链接只能本机用；分享给同事请把地址里的 localhost 换成你的内网 IP（如 10.x.x.x），终端执行 ipconfig getifaddr en0 查看</p>`
+    : '';
+  const initialLink = inviteLink(code, local ? location.host : undefined);
   el.innerHTML = `
     <div class="card">
       <h1 class="neon-title">请神婆代打</h1>
@@ -47,6 +82,7 @@ function renderVictimInvite(app, el) {
 
       <div class="qr-wrap"><canvas id="qr-canvas"></canvas></div>
 
+      ${hostOverrideBlock}
       <div class="invite-actions">
         <button id="copy-link" class="btn-ghost" type="button">📋 复制邀请链接</button>
       </div>
@@ -60,21 +96,24 @@ function renderVictimInvite(app, el) {
     </div>
   `;
 
-  // 二维码（离线 vendored 库）
-  try {
-    const canvas = el.querySelector('#qr-canvas');
-    if (window.qrcode && s.roomCode) {
-      const qr = window.qrcode(0, 'M');
-      qr.addData(link);
-      qr.make();
-      qr.renderTo(canvas, { cellSize: 5, margin: 3, dark: '#140A1F', light: '#F4C430' });
-    }
-  } catch (e) {
-    console.debug('qr render failed', e);
+  const canvas = el.querySelector('#qr-canvas');
+  const hostInput = el.querySelector('#host-override');
+  renderQr(canvas, initialLink, !!s.roomCode);
+
+  // host-override 输入变化：实时用修正后的 host 重拼链接并刷新二维码，
+  // 使二维码与复制链接始终一致指向可访问地址。
+  if (hostInput) {
+    hostInput.addEventListener('input', () => {
+      const host = hostInput.value.trim() || location.host;
+      renderQr(canvas, inviteLink(code, host), !!s.roomCode);
+    });
   }
 
   el.querySelector('#copy-link').addEventListener('click', async () => {
     const hint = el.querySelector('#invite-hint');
+    // 有 host-override 输入框则读其值（空则回退 location.host）；否则无 override。
+    const hostOverride = hostInput ? (hostInput.value.trim() || location.host) : undefined;
+    const link = inviteLink(code, hostOverride);
     try {
       await navigator.clipboard.writeText(link);
       hint.textContent = '已复制邀请链接 ✅';
@@ -119,6 +158,14 @@ function renderShamanJoin(app, el) {
 // 绝不渲染二维码 / 复制邀请链接 / 开始念咒按钮，也不绑定任何 set_lang。
 // phase 转 chanting 后由既有 phase 路由自动切走本页。
 function renderShamanWaiting(app, el) {
+  const s = app.store.state;
+  const flower = s.flower || '小人';
+  const crimes = Array.isArray(s.crimes) ? s.crimes : [];
+  // 罪状牌：神婆受邀代打，须知打的是谁、犯了啥（数据来自后端 join 快照）。
+  const crimesHtml = crimes.length
+    ? crimes.map((c) => `<span class="crime-chip-view">${escapeHtml(c)}</span>`).join('')
+    : '<span class="rite-nocrime">（苦主未列罪状）</span>';
+
   el.innerHTML = `
     <div class="card altar-rite">
       <h1 class="neon-title">开坛法事</h1>
@@ -132,6 +179,13 @@ function renderShamanWaiting(app, el) {
         <span class="rite-item rite-candle">🕯️</span>
       </div>
 
+      <div class="rite-target">
+        <p class="rite-target-label">今日要打的小人</p>
+        <p class="rite-target-name">${escapeHtml(flower)}</p>
+        <p class="rite-target-label">罪状</p>
+        <div class="rite-crimes">${crimesHtml}</div>
+      </div>
+
       <p class="rite-identity"><span class="rite-badge">神婆</span> 你是神婆</p>
       <p class="rite-words">神婆已就位，静候苦主开坛念咒…</p>
 
@@ -140,6 +194,12 @@ function renderShamanWaiting(app, el) {
   `;
 
   renderMembers(app, el.querySelector('#members'));
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }
 
 function renderMembers(app, box) {
