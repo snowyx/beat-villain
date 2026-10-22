@@ -158,10 +158,24 @@ node --test app/js/compliance.test.js       # 前端花名合规纯函数单测�
 
 ## 🤖 本项目全程用 Kiro 完成
 
-本项目从立意到交付，全程在 Kiro 里用 **Spec / Steering / Hooks** 三大能力完成，证据都留在 `.kiro/` 目录：
+本项目从立意到交付，全程在 Kiro 里完成，深度用到 Kiro 的 **Spec / Steering / Hooks** 三大核心能力，并借助 **Kiro Power 生态**（ElevenLabs、exa、长期记忆等）补齐从配音到查证到跨会话记忆的工作流。所有痕迹都留在 `.kiro/` 目录与项目产物里。
+
+### 一、核心能力：Spec / Steering / Hooks
 
 - **Spec 驱动**：需求、设计、任务三份文档位于 `.kiro/specs/kick-bad-guy/`（`requirements.md` 用 EARS 写用户故事与验收标准，`design.md` 定架构 / 房间状态机 / 音频方案 / 协议，`tasks.md` 拆成有序任务清单），并附 `design-review.*` 设计评审裁决。Kiro 按 tasks 逐项实现，spec 本身即参赛材料。
-- **Steering**：`.kiro/steering/民俗合规.md` 与 `.kiro/steering/视觉风格.md` 作为常驻规则，让每一轮代码生成自动遵守合规三红线与港式霓虹纸扎视觉风格，无需每次重复叮嘱。
+- **Steering**：`.kiro/steering/民俗合规.md` 与 `.kiro/steering/视觉风格.md` 作为常驻规则，让每一轮代码生成自动遵守合规三红线与港式霓虹纸扎视觉风格（配色锁定四色），无需每次重复叮嘱。多轮迭代（神婆法事页、鞋拔子→拖鞋、18 鞋、开打 BGM 字幕）全程没有破过一次合规底线，靠的就是 steering 常驻护栏。
 - **Hooks**：`.kiro/hooks/前端改动跑冒烟测试.kiro.hook` 在前端源码保存时自动触发本地冒烟测试（合规纯函数单测 + 后端房间服务单测），把回归校验挂进开发闭环。
 
-想看开发过程，直接翻 `.kiro/` 目录即可：specs 三文档记录了「想清楚再动手」的决策链，steering 两文档是贯穿始终的护栏，hook 是自动化的质量关卡。这正是 Kiro「规格先行、规则常驻、自动校验」协作方式的完整体现。
+### 二、Kiro Power：从配音到查证到长期记忆
+
+本项目安装并运用了多个 Kiro Power，让一个「想法 → 可运行多人应用」的全流程都在 Kiro 内闭环完成：
+
+- **ElevenLabs Power（深度使用）**：三语咒语配音里的英语「开打令」就是通过 ElevenLabs 文本转语音生成的真人质感音频（`app/assets/audio/spell-en-US.mp3`，Harry 战士腔），生成逻辑沉淀在 `scripts/generate-audio.mjs`（API key 仅走环境变量、绝不入库）。配合前端「mp3 优先 → Web Speech → 文字兜底」三级回退，让「神婆念咒」从机械的浏览器 TTS 升级为有表现力的配音。这是 Power 直接决定成品质感的一环。
+- **exa Power（辅助使用）**：用于联网查证——核对比赛页面要求、查 ElevenLabs 账号可用嗓音与接口细节、确认部署平台（Cloudflare / 静态托管 + WebSocket）的真实约束，避免基于过时记忆做决策。Kiro 的实时搜索/抓取能力让「先查清楚再动手」成为默认。
+- **长期记忆 Power（ltm，辅助使用）**：本项目是跨多个会话、十余轮迭代推进的（spec → 实现 → 配音升级 → 神婆法事页 → 拖鞋 → 18 鞋 → BGM 字幕 → 内网共享）。项目级长期记忆让每次「接着上次继续」时能快速恢复上下文、不丢决策链，长周期协作不至于每次从零交代。
+
+> 此外环境内还配置了 context7（库文档检索）、kane-cli（浏览器/移动端自动化测试）、power-builder（Power 开发）等 Power 作为能力储备，可按需接入——体现 Kiro 「能力即插即用、按任务取用」的扩展性。
+
+### 三、一句话总结
+
+想看开发过程，直接翻 `.kiro/` 目录即可：specs 三文档记录「想清楚再动手」的决策链，steering 两文档是贯穿始终的护栏，hook 是自动化的质量关卡，Power 则把配音、查证、记忆等能力接进同一个工作流。这正是 Kiro「规格先行、规则常驻、自动校验、能力即取」协作方式的完整体现——一个人借 Kiro，把一个鬼点子做成了可多人联机、三语配音、合规可分享的完整作品。

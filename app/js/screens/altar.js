@@ -1,9 +1,18 @@
 // 开坛（design §3 altar / §4.1 create_room / 民俗合规 §1 花名拦截）。
-// 花名接 compliance 拦截、6 罪状多选、一键随机花名、缺失禁用提交 → create_room。
+// 花名接 compliance 拦截、多罪状多选、一键随机花名、缺失禁用提交 → create_room。
 
 import { checkFlower, randomFlower } from '../compliance.js';
 
-const CRIMES = ['抢功劳', '甩锅侠', '阴阳怪气', '已读不回', '画饼大师', '卷王本卷'];
+// 罪状标签（职场 / 社交 / 生活解气三类混搭，接地气有梗；可多选）。
+const CRIMES = [
+  // 职场
+  '抢功劳', '甩锅侠', '画饼大师', '卷王本卷', 'PUA大师', '开会狂魔',
+  '临时加需求', '周末发消息', '邀功精',
+  // 社交
+  '阴阳怪气', '已读不回', '已读乱回', '放鸽子专家', '借钱不还', '朋友圈微商',
+  // 生活解气
+  '抢我车位', '外卖偷吃', '公放外放', '插队高手',
+];
 
 export function initAltar(app) {
   const el = app.el;

@@ -1,18 +1,25 @@
 // 前端运行时配置（design §13）。
-// WS_URL 单一事实源，优先级：localStorage 覆盖 > localhost 默认 > 线上占位。
-//   - 本地开发：默认连本机房间服务 ws://localhost:8080
-//   - 线上部署：把 REPLACE_WITH_ROOM_SERVER_HOST 改成实际房间服务地址
-//     （如 wss://room.example.com），或在浏览器控制台执行
-//     localStorage.setItem('WS_URL','wss://room.example.com') 临时覆盖。
+// WS_URL 单一事实源，优先级：localStorage 覆盖 > 按当前访问主机名自动推导 > 线上占位。
+//   - 本地开发：浏览器开 localhost → 连 ws://localhost:8080
+//   - 内网共享：同事用你的内网 IP 打开（如 http://10.253.38.145:5173）→
+//     自动连 ws://10.253.38.145:8080（后端端口固定 8080），无需任何手动配置。
+//   - 公网 https 部署：页面走 https 时自动用 wss://<同主机>:8080；
+//     若后端在别处，用 localStorage.setItem('WS_URL','wss://room.example.com') 覆盖。
 
-const isLocalHost =
-  typeof location !== 'undefined' &&
-  (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+const ROOM_PORT = 8080; // 后端房间服务端口（与 server 默认一致）
+
+function deriveWsUrl() {
+  if (typeof location === 'undefined') return `ws://localhost:${ROOM_PORT}`;
+  const host = location.hostname || 'localhost';
+  // 页面用 https 时 WebSocket 必须用 wss（避免混合内容被浏览器拦截）。
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${host}:${ROOM_PORT}`;
+}
 
 export const CONFIG = {
   WS_URL:
     (typeof localStorage !== 'undefined' && localStorage.getItem('WS_URL')) ||
-    (isLocalHost ? 'ws://localhost:8080' : 'wss://REPLACE_WITH_ROOM_SERVER_HOST'),
+    deriveWsUrl(),
 
   // 落鞋目标（与后端 TARGET_HITS 一致）。
   TARGET_HITS: 18,
