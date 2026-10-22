@@ -1,0 +1,13 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    "FEAT-001 confirmed: invite.js buildInviteLink/inviteLink use a host-override for localhost; copy button and QR both call the same builder so the QR stays consistent with the corrected link; renderVictimInvite shows the editable host-override input + hint only on localhost/127.0.0.1. invite.test.js has 6 passing cases covering IP/localhost/override/https; evidence records 6/6 green.",
+    "FEAT-002 confirmed: resetRoom sets hits=0, villainStage=SWAGGER(嚣张), burned=false, fortune=null, lang=null, phase=ALTAR and preserves code/flower/crimes/target/members/_cleanupTimer. handleReset only allows FORTUNE/BURNING phases and otherwise silently returns a room_state snapshot with no error frame.",
+    "FEAT-002 backend tests present: room-server.test.js adds a resetRoom unit test asserting zeroed fields + preserved flower/crimes/code/members.size; integration test asserts phase=altar/hits=0/burned=false/fortune=null/lang=null/members=2/roomCode preserved/flower+crimes preserved, plus an illegal-phase silent-reject test verifying no error frame. makeSnapshot returns all asserted fields; createRoom accepts {flower,crimes}.",
+    "store.js reset-fallback confirmed: when snapshot.phase==='altar' && snapshot.hits===0 && s.hits>0 the branch sets s.hits=0 and clears burned/fortune, bypassing the Math.max monotonic guard so hits truly returns to 0; s.lang is set to snapshot.lang ?? null before the branch so lang resets to null. store.test.js adds 3 cases (monotonic no-regress, reset zeroing, normal snapshot).",
+    "Steering red lines honored: theme.css palette vars are exactly --zhu-sha-red #E23A3A, --liu-jin-gold #F4C430, --neon-purple #A24BFF, --ink #140A1F; new .host-override and .rite-target styles use only these four vars plus pre-existing #fff/#e9d9ff text tints (e9d9ff already used at lines 265/512); paper beige #F3E6C8 not introduced outside the share-card paper.",
+    "compliance.js untouched by both feature commits (305369d invite fix, f068495 reset): git diff 305369d^..HEAD for app/js/compliance.js is empty.",
+    "Existing features not broken: changes are scoped to invite/reset/store/config/altar-crimes/README; additions (shaman seeing villain flower+crimes on the rite page) are additive. New crime labels are added-only.",
+    "server npm test is green per recorded FEAT-002 evidence: 18/18 (> baseline 15), including resetRoom unit test and two reset integration tests; store.test.js 3/3 and compliance.test.js 8/8 also recorded green."
+  ]
+}

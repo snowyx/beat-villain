@@ -1,0 +1,27 @@
+{
+  "project_type": "H5 竖屏多人解压仪式应用：纯静态前端（原生 ES Module，零构建）+ 单文件 Node WebSocket 内存房间服务。项目根是独立 git 仓库 /Users/zhangji1641/codebase/kiro-idea/1-kickbadguy（不是上层工作区）。",
+  "language": "JavaScript (ES Modules, Node >= 18)，无 TypeScript，无前端框架，无构建步骤。",
+  "build_system": "无构建。前端直接由静态服务器托管（python3 -m http.server 或 npx serve）。后端 server/ 是独立 npm 包（type: module），仅依赖 ws@8.18.0。",
+  "test_command": "后端：cd /Users/zhangji1641/codebase/kiro-idea/1-kickbadguy/server && npm test（= node --test，跑 room-server.test.js + room-server.integration.test.js，基线 15 项全绿）。前端纯函数单测：在仓库根 node --test app/js/<file>.test.js（现有 app/js/compliance.test.js）。",
+  "build_command": "无编译步骤。后端启动：cd server && npm install && npm start（listening on ws://0.0.0.0:8080）。前端：cd app && python3 -m http.server 5173。",
+  "verification_instructions": "1) 后端逻辑/集成：cd server && npm test，须全绿且用例数随新增而增加。2) 前端纯函数：node --test app/js/store.test.js 与 node --test app/js/screens/invite.test.js。3) 手动双标签页冒烟：终端1起后端 npm start，终端2 cd app && python3 -m http.server 5173，浏览器 http://localhost:5173 开两标签页跑苦主+神婆全链路（邀请→念咒→开打18鞋→化灰→签文→重置→第二局）。注意：后端是单一事实源，所有共享进度改动经后端广播。",
+  "snapshot_or_generated_files": "null — 无生成物/快照文件需要 regen。assets/audio/*.mp3 被 .gitignore 忽略、不入库，本任务不涉及。",
+  "environment_constraints": "本任务不启动/不重启长驻服务做自动化（手动冒烟即可）。后端默认端口 8080、前端 5173。config.js 已按 location.hostname 自动推导 WS 地址（localhost→ws://localhost:8080；内网 IP→ws://<IP>:8080；https→wss）——邀请链接修正须与此可访问性口径一致。git 操作务必用 git -C /Users/zhangji1641/codebase/kiro-idea/1-kickbadguy。",
+  "contribution_requirements": "严守 .kiro/steering 两条红线：民俗合规（不诅咒真人/无血腥/民俗定位三红线，不改 app/js/compliance.js 花名拦截）与视觉风格（只用四色 CSS 变量 --zhu-sha-red #E23A3A / --liu-jin-gold #F4C430 / --neon-purple #A24BFF / --ink #140A1F，纸面米黄 #F3E6C8 仅限分享图纸面；楷体栈；375px 竖屏骨相；霓虹辉光）。约定式提交 fix:/feat:，按文件名精确 git add（勿 git add -A），不 push。不破坏既有功能：神婆法事页（含小人花名+罪状显示）、拖鞋挥击、部位反应、开打 BGM+四句粤语字幕、三语配音 mp3、18 下化灰、内网 IP 自动适配、19 个罪状。",
+  "key_patterns": "后端：rooms Map 单一事实源；纯函数 export 供 node:test 直接导入单测（genRoomCode/applyHit/drawFortune/makeSnapshot/enterBurning 等）；routeMessage 顶部 switch(type) 分发（create_room/join_room/set_lang/start_beat/hit/ping）；非法阶段按 PHASE_REJECTED 惯例 console.debug + singleSend(ws,'room_state',{snapshot}) 自愈，不下发 error；仅 ROOM_NOT_FOUND/ROOM_FULL 下发 error 帧；携带 snapshot 的帧用 broadcastSnapshot(room,'room_state')（逐连接填 isSelf）。前端：store.applySnapshot 以快照为结构性状态源、hits 用 Math.max 单调递增防回退；main.js 以 snapshot.phase 为唯一路由依据（altar→invite、chanting→spell、beating→beat、burning→ash、fortune→fortune）；ws.on('room_state')→applySnapshot→renderRoute；ws.send(type,data) 发帧。invite.js inviteLink(roomCode) 当前用 location.origin+pathname 生成，二维码 window.qrcode(...).renderTo 用同一链接。",
+  "relevant_files": [
+    "server/room-server.js — 后端单文件：PHASES/VILLAIN_STAGES 枚举、createRoom、makeSnapshot、broadcastSnapshot、enterBurning、applyHit、handleSetLang/handleStartBeat/handleHit、routeMessage 的 switch(type)、requireRoom、__resetState。新增 reset 在此。",
+    "server/room-server.test.js — 后端单元测试（node:test），导入纯函数直接断言。新增 resetRoom 用例。",
+    "server/room-server.integration.test.js — 后端集成测试（真实 ws Client 封装 waitFor）。新增 reset 全链路 + 非法阶段拒绝用例。",
+    "app/js/screens/invite.js — 苦主邀请屏 renderVictimInvite + inviteLink + 二维码 + renderShamanWaiting/renderShamanJoin/renderMembers/refreshInviteMembers。问题1 主改点。",
+    "app/js/screens/fortune.js — 签文屏 initFortune，当前只有分享按钮。问题2 加重置按钮。",
+    "app/js/store.js — Store.applySnapshot/applyHit/applyFortune/setBurned/setMembers。问题2 reset 回落（hits 绕过 Math.max）主改点。",
+    "app/js/main.js — screenForState phase 路由、wireWs 各帧处理（room_state/hit/burn/fortune/member_change）。确认 reset 后 room_state 自动切屏，通常无需改。",
+    "app/js/config.js — WS_URL 按 location.hostname 自动推导（localhost/IP/https）。问题1 邀请链接口径参照。",
+    "app/js/ws-client.js — WsClient.send(type,data) / on(type,fn)。",
+    "app/css/theme.css — 四色 CSS 变量与霓虹样式。问题1 若需新增 host-override 输入样式在此追加。",
+    ".kiro/specs/kick-bad-guy/design.md — §3 状态机、§4.1 C2S、§4.5 错误码。问题2 补 reset。",
+    ".kiro/steering/民俗合规.md、.kiro/steering/视觉风格.md — 常驻红线，每轮须遵守。"
+  ],
+  "directory_structure": "1-kickbadguy/{app/{index.html,css/theme.css,js/{main.js,config.js,ws-client.js,store.js,audio.js,villain.js,share-card.js,compliance.js,compliance.test.js,screens/{altar,invite,spell,beat,ash,fortune}.js},vendor/qrcode.min.js},server/{room-server.js,room-server.test.js,room-server.integration.test.js,package.json},scripts/generate-audio.mjs,assets/audio/,.kiro/{specs/kick-bad-guy/{requirements,design,tasks}.md,steering/{民俗合规,视觉风格}.md,hooks/},.agents/tasks/}"
+}

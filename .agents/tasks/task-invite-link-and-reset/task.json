@@ -1,0 +1,7 @@
+{
+  "task_id": "task-invite-link-and-reset",
+  "task_description": "在赛博打小人 H5 项目上修两个问题：(1) 复制给神婆的邀请链接在 localhost 场景无法被内网同事访问——加可编辑主机地址输入与提示，复制/二维码用修正后 host；(2) 打小人结束（fortune）后无法重来——新增 reset 消息（后端+前端+design+测试），重置进度但保留房间成员/花名/罪状。严守民俗三红线与视觉四色，不改 compliance.js。约定式提交，不 push。",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

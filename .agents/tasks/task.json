@@ -1,0 +1,7 @@
+{
+  "task_id": "task-shaman-altar-and-shoehorn",
+  "task_description": "赛博打小人 H5 两项纯前端改动：(1) 神婆进坛成功后看独立「开坛法事等待页」而非苦主邀请屏——altar 阶段按角色分流，苦主路径保持不变，神婆看法事等待视图（无二维码/复制链接/开始念咒按钮），苦主点开始念咒后两端随 phase 自动一起进念咒屏；(2) 打小人时新增「鞋拔子/拖鞋」从侧上方快速挥下拍打被击中部位、定格后回弹的 canvas 挥击动画，纯本地即时反馈（方案 B），配合既有整体弹跳/部位反应/拟声词。严守合规三红线与视觉四色，不动后端协议与 compliance 花名拦截。",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

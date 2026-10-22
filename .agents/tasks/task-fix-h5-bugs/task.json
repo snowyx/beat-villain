@@ -1,0 +1,7 @@
+{
+  "task_id": "task-fix-h5-bugs",
+  "task_description": "修复 H5 前端两个 bug：(1) 神婆点「进坛代打」报 ROOM_NOT_FOUND，根因是 ws-client.js 缺心跳保活导致苦主停留邀请屏时空闲连接被掐断、房间被 cleanup；修法是加定时 ping（后端已支持 ping→pong）。(2) 转运签页 #reset-btn 看不见，根因是 theme.css 的 .bottom-bar 未支持双按钮堆叠；修法是改为纵向 flex 并给 .fortune-card 预留底部空间。不改后端协议/状态机。",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

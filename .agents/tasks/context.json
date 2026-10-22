@@ -1,0 +1,25 @@
+{
+  "project_type": "纯静态 H5 竖屏单页（375px 小程序骨相）原生 ES Module 前端 + 单文件 Node ws 内存房间服务；零构建、零数据库",
+  "language": "JavaScript (原生 ES Module，无 TS，无打包器)",
+  "build_system": "无构建步骤。前端直接由静态服务器托管 app/；后端 server/ 为单文件 Node ws 服务。根目录无 package.json，package.json 只在 server/。",
+  "build_command": "无（前端零构建）。校验改动是否可加载：node --test app/js/compliance.test.js（确保模块无语法错）。",
+  "test_command": "后端：cd server && npm test（node --test，15 项）。前端合规纯函数单测：在项目根执行 node --test app/js/compliance.test.js（8 项）。",
+  "verification_instructions": "1) 后端：cd server && npm install && npm start，看到 'listening on ws://0.0.0.0:8080' 即成功，保持开着。2) 前端：cd app && python3 -m http.server 5173（或 npx serve app -l 5173），浏览器开 http://localhost:5173/。3) 双人流程用两个浏览器标签页：A=苦主开坛→拿邀请链接；复制 #/join?room=CODE 到 B=神婆→点进坛代打。4) 跑 cd server && npm test 应 15/15；node --test app/js/compliance.test.js 应 8/8；控制台 0 error。",
+  "snapshot_or_generated_files": "无代码生成/快照文件。app/assets/audio/spell-zh-HK.mp3 与 spell-en-US.mp3 为运行时音频资产，勿删勿提交无关大文件。根目录 chat_tts_*.mp3 为粤语源，勿提交。",
+  "environment_constraints": "后端默认 ws://0.0.0.0:8080（PORT 可覆盖，覆盖后前端需 localStorage.setItem('WS_URL','ws://localhost:PORT')）。前端必须经 http:// 访问（file:// 连不上后端）。.gitignore 忽略根 assets/audio/*.mp3、.env、node_modules；app/assets/audio/ 未被忽略，提交时只 git add 本次改到的前端源码，勿纳入 .env/mp3/node_modules。当前分支 main，工作区已有 app/js/audio.js、app/js/config.js 的未提交改动（他人改动，勿动）。",
+  "contribution_requirements": ".kiro/steering 为常驻护栏，每轮实现必须遵守：民俗合规.md 三红线（不诅咒真人——不碰 compliance.js 花名拦截与一键随机花名逃生口；无血腥——仅卡通纸片人，朱砂红不作血，鞋拍击是卡通喜剧动作，无伤口/血液/断肢；民俗定位标注——页脚『本应用为民俗文化体验与解压娱乐』常驻不移除）。视觉风格.md 四色锁定：朱砂红 #E23A3A、鎏金黄 #F4C430、霓虹紫 #A24BFF、墨底 #140A1F；CSS 引用 --zhu-sha-red/--liu-jin-gold/--neon-purple/--ink，canvas 沿用 villain.js 顶部 RED/GOLD/PURPLE/INK/PAPER 常量，不写死散色。",
+  "key_patterns": "界面路由以后端快照 phase 为唯一依据：main.js screenForState 把 phase 映射到屏 key；altar→invite，chanting→spell，beating→beat，burning→ash，fortune→fortune。invite 屏有子视图机制：inviteSubview() 返回标记，renderRoute 用 _inviteSubview 比较触发强制重渲染（避免停在旧子视图/闪烁）。角色：room_joined 回传 d.role，store.applySnapshot(snapshot,{role}) 写入 state.role，也可从 members[].isSelf.role 推断——优先用 store.state.role 判角色。落鞋链路：beat.js smack(part) 本地调 villain.onHit()+onHitPart(part)+playSmack() 再发 hit 给后端（方案 B：部位反应纯本地，不走后端）；part 由 villain.hitPartAt(x,y) 判定为 head|belly|legs；villain.parts 是相对人形中心 cx,cy 的部位矩形。villain.js 单实例 tween 规则：onHit retrigger 整体阻尼正弦弹跳；已有拖鞋印粒子 _drawSlipperMark/slippers，无鞋挥击动作。",
+  "relevant_files": [
+    "app/js/main.js — 屏路由 screenForState/renderRoute、inviteSubview 子视图标记（需求1 改此）",
+    "app/js/screens/invite.js — renderVictimInvite/renderShamanJoin/renderMembers（需求1 新增 renderShamanWaiting）",
+    "app/js/store.js — state.role/state.phase，role 从 d.role 与 members isSelf 推断（只读参考）",
+    "app/js/villain.js — canvas 纸片人、onHit/onHitPart、拖鞋印 _drawSlipperMark/slippers、parts/hitPartAt、化灰（需求2 新增鞋拔子挥击动画）",
+    "app/js/screens/beat.js — 开打屏 smack(part) 调 villain（需求2 触发挥击、传部位）",
+    "app/css/theme.css — 港式霓虹样式，:root 四色变量、.card/.neon-title/.room-code/.members-line/.invite-actions/.bottom-bar（需求1 加法事等待页样式）",
+    "app/index.html — 六个 screen 容器 section#screen-*，footer 常驻合规声明（参考，不需改）",
+    "server/room-server.js — join 回传 role、makeSnapshot 带 members[].isSelf（只读参考，不改）",
+    "app/js/compliance.js / app/js/compliance.test.js — 花名拦截与单测（不得改坏）",
+    ".kiro/steering/民俗合规.md / .kiro/steering/视觉风格.md — 常驻护栏"
+  ],
+  "directory_structure": "app/ 前端（index.html、css/theme.css、js/ 状态路由ws音频分享图+screens/六流程态、vendor/qrcode）；server/ 单文件 ws 房间服务+测试（含 package.json）；scripts/ ElevenLabs 预生成脚本；assets/audio 与 app/assets/audio mp3；.kiro/ specs+steering+hooks；.agents/tasks/ 本次计划与 FEAT 制品。"
+}

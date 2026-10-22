@@ -1,0 +1,23 @@
+{
+  "project_type": "纯静态 H5 单页前端（原生 ES Module，零构建）+ 单文件 Node ws 内存房间服务（单一事实源）",
+  "language": "JavaScript (ES Modules), CSS",
+  "build_system": "零构建。前端直接由静态服务器提供（python3 -m http.server 5173），后端 node room-server.js。无打包步骤。",
+  "build_command": "无构建步骤（纯静态 + 原生 ESM）",
+  "test_command": "后端：cd server && npm test（node --test，18 项）。前端：在仓库根运行 node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js（17 项，纯函数无 DOM）。",
+  "test_framework": "node:test（内置），无第三方测试框架。前端单测均为无 DOM 的纯函数测试。",
+  "verification_instructions": "1) 跑后端 cd server && npm test 应 18/18 绿。2) 跑前端 node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js 应全绿。3) 端到端：cd server && npm start（:8080）、cd app && python3 -m http.server 5173（:5173），浏览器 http://localhost:5173/。可用 Node ws 客户端脚本（引入 server/node_modules 的 ws，连 ws://localhost:8080，首帧发 hello→收 hello_ok 后发业务帧）精确复现房间流程。4) 浏览器验证用 375x667 竖屏视口。",
+  "snapshot_or_generated_files": "无构建产物需入库。app/assets/audio 下三个 mp3 由 scripts/generate-audio.mjs 生成且被 .gitignore 忽略（不入库，勿删改）。",
+  "environment_constraints": "不改后端协议/状态机（后端已验证 18/18 绿）。不提交 .env / node_modules。不删改 app/assets/audio 下的 mp3。两个服务可能已在跑（:8080 / :5173），需要时才启动。合规三红线（compliance.js）与四色锁定不可破。",
+  "contribution_requirements": "Steering 常驻规则：.kiro/steering/视觉风格.md（配色锁定四色 #E23A3A/#F4C430/#A24BFF/#140A1F + 米黄 #F3E6C8，霓虹纸扎风，375px 竖屏，色值引用 CSS 变量而非写死）与 .kiro/steering/民俗合规.md（不诅咒真人、无血腥、民俗定位标注）。每轮前端改动须自动遵守。有一个 hook 在前端源码保存时跑冒烟测试。",
+  "key_patterns": "WsClient（app/js/ws-client.js）：首帧契约 hello→hello_ok{clientId}，clientId 存 sessionStorage，业务帧在 hello_ok 前经 send() 排队 _queue、之后 flush，断线 _scheduleReconnect 重连并重发 hello 带旧 clientId；_raw 直发 JSON 帧（绕过排队）。后端 room-server.js 的 routeMessage 已有 case 'ping': singleSend(ws,'pong',{})。CSS：所有屏共用 .bottom-bar（position:absolute;bottom:16px）放主按钮区；卡片用 .card（padding 18px 16px 90px）。fortune.js 的 .bottom-bar 内有 #share-btn(btn-primary)+#reset-btn(btn-ghost) 两个按钮并列。",
+  "relevant_files": [
+    "app/js/ws-client.js — BUG1 要改：加定时 ping 心跳",
+    "app/css/theme.css — BUG2 要改：.bottom-bar 纵向堆叠 + .fortune-card 底部留白",
+    "app/js/screens/fortune.js — 只读参照：#share-btn/#reset-btn 结构（按钮代码已存在，无需改）",
+    "server/room-server.js — 只读参照：handleHello/handleJoinRoom/handleClose/cleanupRoom/CLEANUP_DELAY_MS(60s)/routeMessage 的 ping 分支",
+    "app/js/config.js — 只读参照：WS_URL 推导、TARGET_HITS=18",
+    "app/js/store.test.js / app/js/screens/invite.test.js / app/js/compliance.test.js — 前端单测",
+    "server/room-server.test.js / server/room-server.integration.test.js — 后端单测"
+  ],
+  "directory_structure": "app/（前端：index.html、css/theme.css、js/*.js + js/screens/*.js + vendor/qrcode.min.js）；server/（room-server.js + 两个 test + package.json，npm start/npm test）；scripts/（可选 ElevenLabs 配音生成）；assets|app/assets/audio（mp3，不入库）；.kiro/steering/（合规+视觉风格常驻规则）；.agents/tasks/（本制品）。"
+}
