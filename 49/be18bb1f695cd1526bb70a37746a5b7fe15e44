@@ -1,0 +1,32 @@
+.agents/tasks/plan.md
+  h_57a4b15c8feaaa 1,3,5,7-11,13-47,51-121
+.kiro/specs/kick-bad-guy/design.md
+  h_57a4b15c8feaaa 90-96,99-101,105,109,135-136,209
+app/js/main.js
+  h_57a4b15c8feaaa 10,58-63,162-167
+app/js/screens/altar.js
+  h_57a4b15c8feaaa 19-22,42,98-104
+app/js/screens/invite.js
+  h_57a4b15c8feaaa 46-90,162-163,166-168,170-171,210-236,251,254,263-274
+app/js/store.js
+  h_57a4b15c8feaaa 58,60-61,68-69
+app/js/store.test.js
+  h_57a4b15c8feaaa 23,25-34,41,43,50-51,59-60
+server/room-server.integration.test.js
+  h_57a4b15c8feaaa 173,205,220-221,228-370
+server/room-server.js
+  h_57a4b15c8feaaa 264-268,277-278,481-514,560-562
+server/room-server.test.js
+  h_57a4b15c8feaaa 128,130,143,151-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "49be18bb1f695cd1526bb70a37746a5b7fe15e44",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
