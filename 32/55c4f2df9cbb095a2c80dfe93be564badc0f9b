@@ -1,0 +1,14 @@
+提交材料.md
+  h_57a4b15c8feaaa 9-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3255c4f2df9cbb095a2c80dfe93be564badc0f9b",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
