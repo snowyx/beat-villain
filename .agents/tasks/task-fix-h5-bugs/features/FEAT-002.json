@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "BUG2：转运签页看不到「🔄 再请一位小人」按钮(#reset-btn)。按钮代码在 app/js/screens/fortune.js 的 .bottom-bar 内已存在（与 #share-btn 并列），根因是 app/css/theme.css 的 .bottom-bar 未支持双按钮：它是 position:absolute;left/right:16px;bottom:16px 且无 flex/gap/方向，#share-btn 为 width:100% 块级，第二个 #reset-btn 紧贴其后无间距并被挤出 .fortune-card(padding-bottom:90px)/视口底部，在 375×667 竖屏不可见。修法：把 .bottom-bar 改为纵向 flex 堆叠+gap，让两按钮各占一行；并给 .fortune-card 预留足够底部空间避免遮挡。单按钮屏(invite/spell/beat 等)不受影响。此 FEAT 与 FEAT-001 相互独立（改不同文件）。",
+  "status": "completed",
+  "steps": [
+    "编辑 app/css/theme.css 的 .bottom-bar 规则：保留现有 position:absolute; left:16px; right:16px; bottom:16px，新增 display:flex; flex-direction:column; gap:10px;（纵向堆叠，两按钮各占一行；单子项屏布局不变）。",
+    "新增/调整 .fortune-card 的底部留白：.fortune-card 复用 .card（padding 18px 16px 90px）。为容纳 share+reset 两个按钮（btn-primary ~52px + gap 10px + btn-ghost ~40px ≈ 100px 以上），给 .fortune-card 单独设 padding-bottom 约 150px（只针对 .fortune-card，不改全局 .card，避免影响其它单按钮屏）。",
+    "色值只用锁定四色 CSS 变量（--zhu-sha-red #E23A3A / --liu-jin-gold #F4C430 / --neon-purple #A24BFF / --ink #140A1F）+ 既有米黄 #F3E6C8，不新增散色；#reset-btn 保留 btn-ghost 的港式霓虹辨识度与「🔄 再请一位小人」整活文案（文案在 fortune.js，无需改）。",
+    "不改 fortune.js（按钮结构与事件已正确）、不改后端。"
+  ],
+  "acceptance_criteria": [
+    "375×667 竖屏走到转运签屏时，#share-btn 与 #reset-btn 两个按钮都完整可见、不重叠、不被卡片或视口裁切。",
+    "点击 #reset-btn 后两端收到 room_state（phase=altar、hits=0），可再来一局（走 reset 既有链路）。",
+    "其它使用 .bottom-bar 的单按钮屏（邀请/念咒/开打等）视觉与布局不回归。",
+    "运行 cd server && npm test 仍 18/18；前端 node --test 三组单测全绿（CSS 改动不影响单测，但确认未误伤）。"
+  ],
+  "verification": [
+    "端到端（临时脚本/浏览器，验证后删除）：用 Node ws 客户端把房间推进到 fortune（hello→create_room→set_lang→start_beat→打18下→收 burn/fortune），或浏览器手动打满18下；浏览器在 375×667 视口对转运签屏截图，确认 #reset-btn 可见。",
+    "点击 #reset-btn，断言两端收到 room_state 且 snapshot.phase==='altar'、hits===0。",
+    "cd server && npm test  → 18/18 绿；在仓库根 node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js  → 全绿。",
+    "打开邀请屏/开打屏目测其单个主按钮位置未变（无回归）。"
+  ],
+  "blocked_reason": null,
+  "findings": "仅改 app/css/theme.css 两处：(1) .bottom-bar 在保留 position:absolute; left/right:16px; bottom:16px 的基础上新增 display:flex; flex-direction:column; gap:10px，使 #share-btn/#reset-btn 两按钮纵向堆叠各占一行；单按钮屏（邀请/念咒/开打等）只有一个子项，纵向 flex 不改变其布局。(2) 新增 .fortune-card{padding-bottom:150px}，仅作用于转运签屏（不改全局 .card 的 90px），为双按钮预留足够底部空间。未改 fortune.js、未改后端。配色仅沿用锁定四色变量 + 既有米黄 #F3E6C8，无新增散色，合规三红线/四色锁定未破。验证：后端 cd server && npm test = 18/18 绿；前端根目录 node --test app/js/store.test.js app/js/screens/invite.test.js app/js/compliance.test.js = 全绿（17 项）。Playwright 375×667 视口以 fortune.js 的真实 DOM 结构 + 真实 theme.css 渲染转运签屏并测量：.bottom-bar display=flex/column/gap=10px，.fortune-card padding-bottom=150px，#share-btn(top332,bottom390) 与 #reset-btn(top400,bottom443) 不重叠、均完整落在视口(≤667)与卡片(bottom460)内，shareVisible/resetVisible 均 true；截图确认两按钮完整可见、不被裁切。reset 既有链路（点击发 reset → 后端广播 room_state phase=altar/hits=0）由 store.test.js 的 applySnapshot reset 用例覆盖，保持不变。"
+}

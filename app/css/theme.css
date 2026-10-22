@@ -230,6 +230,9 @@ body {
   left: 16px;
   right: 16px;
   bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .btn-primary {
@@ -699,6 +702,13 @@ body {
 }
 
 /* ── 签文屏 ── */
+/* 转运签屏底部操作条为双按钮纵向堆叠（#share-btn + #reset-btn），
+   需比全局 .card(padding-bottom:90px) 预留更多底部空间，避免 #reset-btn
+   被卡片/视口裁切；仅作用于 .fortune-card，不影响其它单按钮屏。 */
+.fortune-card {
+  padding-bottom: 150px;
+}
+
 .fortune-list {
   margin: 16px 0;
 }
