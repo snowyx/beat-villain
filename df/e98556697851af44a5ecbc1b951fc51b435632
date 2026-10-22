@@ -1,0 +1,18 @@
+README.md
+  h_57a4b15c8feaaa 161-163,166,169-181
+app/js/config.js
+  h_57a4b15c8feaaa 2-7,9-17,22
+app/js/screens/altar.js
+  h_57a4b15c8feaaa 2,6-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "dfe98556697851af44a5ecbc1b951fc51b435632",
+  "prompts": {},
+  "humans": {
+    "h_57a4b15c8feaaa": {
+      "author": "zhangji1641 <zhangji1641@jd.com>"
+    }
+  }
+}
