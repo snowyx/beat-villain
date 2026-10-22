@@ -5,7 +5,7 @@
 //   - 后端内存 Map 是「单一事实源」：所有改变共享进度的动作只经后端改内存并广播。
 //   - 裸 ws server（不引入 HTTP / 路径路由），监听 0.0.0.0:PORT（默认 8080）。
 //   - 首帧契约：每条连接必须先发 hello → 收 hello_ok{clientId} 后方可发业务消息。
-//   - 落鞋 hits 由后端权威累加（不信任客户端计数），封顶 8，达 8 化灰并抽签锁定。
+//   - 落鞋 hits 由后端权威累加（不信任客户端计数），封顶 18，达 18 化灰并抽签锁定。
 //
 // 可测性：纯函数（genRoomCode/recomputeStage/applyHit/drawFortune/makeSnapshot）
 // 直接 export，供 room-server.test.js 导入；仅当作为入口直接运行时才启动监听。
@@ -16,13 +16,13 @@ import { WebSocketServer, WebSocket } from 'ws';
 // 常量
 // ──────────────────────────────────────────────────────────────────────────
 
-export const TARGET_HITS = 8;
+export const TARGET_HITS = 18;
 
 // 房间码字符集：大写字母+数字，排除易混的 0 O 1 I L
 const ROOM_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const ROOM_CODE_LEN = 6;
 
-// 四阶段阈值（design §6）：0–2 嚣张 / 3–4 懵逼 / 5–7 冒烟 / 8 化灰
+// 四阶段阈值（design §6）：0–5 嚣张 / 6–10 懵逼 / 11–17 冒烟 / 18 化灰
 export const VILLAIN_STAGES = Object.freeze({
   SWAGGER: '嚣张',
   DAZED: '懵逼',
@@ -89,12 +89,12 @@ export function genRoomCode(existing = rooms) {
 
 /**
  * 按 hits 推算小人阶段（design §6 边界）：
- * hits<3 嚣张 / <5 懵逼 / <8 冒烟 / 8 化灰
+ * hits<6 嚣张 / <11 懵逼 / <18 冒烟 / 18 化灰
  */
 export function stageForHits(hits) {
-  if (hits < 3) return VILLAIN_STAGES.SWAGGER;
-  if (hits < 5) return VILLAIN_STAGES.DAZED;
-  if (hits < 8) return VILLAIN_STAGES.SMOKING;
+  if (hits < 6) return VILLAIN_STAGES.SWAGGER;
+  if (hits < 11) return VILLAIN_STAGES.DAZED;
+  if (hits < 18) return VILLAIN_STAGES.SMOKING;
   return VILLAIN_STAGES.ASH;
 }
 
@@ -155,7 +155,7 @@ export function makeSnapshot(room, selfClientId) {
 }
 
 /**
- * 权威落鞋：仅 beating 阶段生效，hits 封顶 8；达 8 触发化灰。
+ * 权威落鞋：仅 beating 阶段生效，hits 封顶 18；达 18 触发化灰。
  * 返回描述本次 hit 结果的对象，供路由决定广播哪些帧。
  */
 export function applyHit(room) {

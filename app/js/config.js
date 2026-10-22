@@ -15,9 +15,11 @@ export const CONFIG = {
     (isLocalHost ? 'ws://localhost:8080' : 'wss://REPLACE_WITH_ROOM_SERVER_HOST'),
 
   // 落鞋目标（与后端 TARGET_HITS 一致）。
-  TARGET_HITS: 8,
+  TARGET_HITS: 18,
 
-  // mp3 静态清单（design §8）：本次不预生成，三者皆 false → 运行时走 Web Speech。
-  // scripts/generate-audio.mjs 生成 mp3 后，手动把对应项置 true 即走 mp3 分支。
-  AUDIO_MANIFEST: { 'zh-CN': false, 'zh-HK': false, 'en-US': false },
+  // mp3 静态清单（design §8）：对应项为 true 时优先播 assets/audio/spell-<lang>.mp3，否则走 Web Speech。
+  //   - zh-CN 普通话：无 mp3，走浏览器 Web Speech（系统普通话嗓音质量尚可）
+  //   - zh-HK 粤语：用预置 mp3（spell-zh-HK.mp3），补上浏览器缺粤语嗓音的短板
+  //   - en-US 英语：用 ElevenLabs 预生成 mp3（spell-en-US.mp3，Harry 战士腔）
+  AUDIO_MANIFEST: { 'zh-CN': false, 'zh-HK': true, 'en-US': true },
 };

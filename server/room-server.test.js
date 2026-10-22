@@ -43,24 +43,24 @@ test('genRoomCode: 与已有容器查重，不返回已占用码', () => {
 
 // ── stageForHits / recomputeStage 边界 ─────────────────────────────────────
 
-test('stageForHits: 四阶段边界 0/2/3/4/5/7/8', () => {
+test('stageForHits: 四阶段边界 0/5/6/10/11/17/18', () => {
   assert.equal(stageForHits(0), VILLAIN_STAGES.SWAGGER);
-  assert.equal(stageForHits(2), VILLAIN_STAGES.SWAGGER);
-  assert.equal(stageForHits(3), VILLAIN_STAGES.DAZED);
-  assert.equal(stageForHits(4), VILLAIN_STAGES.DAZED);
-  assert.equal(stageForHits(5), VILLAIN_STAGES.SMOKING);
-  assert.equal(stageForHits(7), VILLAIN_STAGES.SMOKING);
-  assert.equal(stageForHits(8), VILLAIN_STAGES.ASH);
+  assert.equal(stageForHits(5), VILLAIN_STAGES.SWAGGER);
+  assert.equal(stageForHits(6), VILLAIN_STAGES.DAZED);
+  assert.equal(stageForHits(10), VILLAIN_STAGES.DAZED);
+  assert.equal(stageForHits(11), VILLAIN_STAGES.SMOKING);
+  assert.equal(stageForHits(17), VILLAIN_STAGES.SMOKING);
+  assert.equal(stageForHits(18), VILLAIN_STAGES.ASH);
 });
 
 test('recomputeStage: 写回 room.villainStage 并报告是否跨越', () => {
   const room = createRoom('AAAAAA');
   room.hits = 0;
   assert.equal(recomputeStage(room), false); // 初始即嚣张，无变化
-  room.hits = 3;
+  room.hits = 6;
   assert.equal(recomputeStage(room), true);
   assert.equal(room.villainStage, VILLAIN_STAGES.DAZED);
-  room.hits = 4;
+  room.hits = 10;
   assert.equal(recomputeStage(room), false); // 同阶段内无跨越
 });
 
@@ -77,16 +77,16 @@ test('applyHit: 非 beating 阶段忽略', () => {
 test('applyHit: beating 阶段逐次累加并随阈值推进阶段', () => {
   const room = createRoom('AAAAAA');
   room.phase = PHASES.BEATING;
-  for (let i = 0; i < 3; i++) applyHit(room);
-  assert.equal(room.hits, 3);
+  for (let i = 0; i < 6; i++) applyHit(room);
+  assert.equal(room.hits, 6);
   assert.equal(room.villainStage, VILLAIN_STAGES.DAZED);
 });
 
-test('applyHit: 达 8 封顶并进入化灰+签文，之后忽略多余 hit', () => {
+test('applyHit: 达 18 封顶并进入化灰+签文，之后忽略多余 hit', () => {
   const room = createRoom('AAAAAA');
   room.phase = PHASES.BEATING;
   for (let i = 0; i < 100; i++) applyHit(room); // 超打
-  assert.equal(room.hits, TARGET_HITS, 'hits 封顶 8');
+  assert.equal(room.hits, TARGET_HITS, 'hits 封顶 18');
   assert.equal(room.villainStage, VILLAIN_STAGES.ASH);
   assert.equal(room.burned, true);
   assert.equal(room.phase, PHASES.FORTUNE);
@@ -116,7 +116,7 @@ test('drawFortune: 锁定幂等——二次调用返回同一对象值', () => {
 test('enterBurning: 幂等——二次调用不改变已锁定签文', () => {
   const room = createRoom('AAAAAA');
   room.phase = PHASES.BEATING;
-  room.hits = 8;
+  room.hits = 18;
   enterBurning(room);
   const locked = room.fortune;
   enterBurning(room);
