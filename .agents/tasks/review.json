@@ -1,5 +1,18 @@
 {
   "verdict": "APPROVED",
-  "findings": [],
+  "findings": [
+    {
+      "label": "夹带的复制降级改动",
+      "confidence": "possible",
+      "blocking": false,
+      "detail": "commit 与未提交的 theme.css 把邀请链接复制的多级降级（clipboard→execCommand→手动复制框 + .copy-fallback 样式）一并带入，属于另一桩「复制链接不生效」缺陷，与重启需求同坛但不同事。功能无害、escapeHtml 已转义、色彩落在锁定四色+ink 内合规。建议确认是否应单独成提交/单独评审。"
+    },
+    {
+      "label": "relist 被拒后 altar 按钮不回弹（仅对抗性客户端可达）",
+      "confidence": "possible",
+      "blocking": false,
+      "detail": "altar 点击后 createBtn.disabled=true；若 relist 被服务端静默拒绝且 flower 仍空，苦主停在 altar 屏、renderRoute 因屏未变提前 return，按钮保持 disabled 不回弹。正常链路下 validate()（name≥1）与服务端 flower 非空校验一致，不可触发；仅手工构造空 flower 提交才可能。建议在 relist 失败路径给按钮兜底回弹，优先级低。"
+    }
+  ],
   "reviewDoc": "/Users/zhangji1641/codebase/kiro-idea/1-kickbadguy/.agents/tasks/review.md"
 }

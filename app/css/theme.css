@@ -198,6 +198,20 @@ body {
   color: #7CFF9E;
 }
 
+/* 复制受限时的可手动复制链接框（内网 IP 非安全上下文下 clipboard 被禁的降级）。 */
+.copy-fallback {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--liu-jin-gold);
+  background: rgba(20, 10, 31, 0.7);
+  border: 1px solid rgba(244, 196, 48, 0.5);
+  border-radius: 8px;
+  user-select: all;
+}
+
 .crime-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

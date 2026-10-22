@@ -9,5 +9,8 @@ node_modules/
 # 注意：app/assets/audio/ 下的 mp3 是运行时必需资产（三语咒语配音 + 开打 BGM），
 #       必须随前端一起部署，故不在此忽略——见已跟踪的 spell-*.mp3 与 beat-bgm.mp3。
 
+# 本地原始音频素材备份（运行时资产位于 app/assets/audio/，已单独跟踪）
+/*.mp3
+
 # macOS
 .DS_Store

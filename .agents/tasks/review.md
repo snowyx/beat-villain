@@ -1,53 +1,96 @@
-# 评审 · 打击目标 8→18 + 挥击工具改拖鞋
+# 重置回到开坛立牌页 + relist 重新立牌打全新小人
 
-范围：仓库 `/Users/zhangji1641/codebase/kiro-idea/1-kickbadguy/` 两次提交
-- `18ca3a2` feat: 打击目标 8 改为 18 并按新阈值重分四阶段
-- `6868ea1` feat: 挥击工具由鞋拔子改为港式人字拖
+苦主在转运签屏点「🔄 再请一位小人」后回到开坛立牌页为全新小人重新起名选罪状，神婆留在坛里看等待态并在苦主重新立牌后自动看到新小人续局。实现方式是给 `reset` 加新语义（额外清空 `flower=''`/`crimes=[]` 进入「待重新立牌」态，`phase` 仍为 `altar`），并新增一条 `relist` C2S 消息让苦主在原房间提交新身份。前端用 `role + phase + flower` 三元组路由区分开坛立牌页、邀请屏与神婆等待页，房间码与成员全程不变。设计没有新增 phase 枚举，而是复用「`altar` + flower 空/非空」表达两个子态，改动面收敛。
 
-对照计划 `.agents/tasks/plan.md`。结论：**APPROVED**，无阻断性问题。
+Watch for: 本次 commit 顺带夹带了邀请链接复制的多级降级（`copyText`/`copy-fallback`/execCommand）与一处未提交的 `theme.css` 样式，属于另一桩「复制链接」缺陷的修复，与重启需求同坛但不同事（possible — 见下文「夹带的复制降级改动」）。核心 relist 链路本身无阻断性问题。
 
-## 验证证据（读取 coder 记录，未重跑套件）
+**Verdict**: APPROVED
 
-提交信息已记录：
-- 后端 `cd server && npm test` → tests 15 pass 0 fail
-- 前端 `cd app && node --test js/compliance.test.js` → 8 pass
-- `node --check app/js/villain.js` 通过；`grep` 无 鞋拔子/Shoehorn 残留
+## High-level view
 
-本评审对代码与文档做了静态核验（grep/读取），未重跑测试套件；仅对一致性做窄范围抽查。
+reset 新语义落在 `resetRoom`：在原有归零基础上追加 `flower=''`、`crimes=[]`，保留 `code/target/members/_cleanupTimer`，语义与注释、design.md §3 一致。前端据 `flower` 空判定「待重新立牌」，不引入新 phase。
 
-## 任务 1：8 → 18 全链路一致
+relist 是一条独立的权限/阶段受控消息：仅 `victim`、仅 `altar && flower===''` 态、flower trim 后非空才更新身份，任何不满足都按 `PHASE_REJECTED` 静默回一帧快照自愈、不下发 error，与既有 reset/set_lang 的失败口径统一。成功后 `phase` 维持 `altar` 并 `broadcastSnapshot`，神婆同步看到新小人，后续复用首次开坛的邀请→念咒→开打路径。
 
-- **常量单一来源**：`app/js/config.js:18` `TARGET_HITS: 18`；`server/room-server.js:19` `export const TARGET_HITS = 18`。两处一致。✓
-- **封顶 / 化灰 / 超打**：`applyHit`（room-server.js:160-172）`room.hits = Math.min(TARGET_HITS, room.hits + 1)`，`hits >= TARGET_HITS && phase===BEATING` 进 `enterBurning`；非 beating 阶段 `applyHit` 直接 `applied:false`，hit 路由（:433-436）`phase !== BEATING` 走 `[PHASE_REJECTED]` 静默回快照。逻辑表达式未改，仅常量，天然封顶 18。✓
-- **四阶段阈值三处一致**（0–5 嚣张 / 6–10 懵逼 / 11–17 冒烟 / 18 化灰，即 hits<6/<11/<18/>=18）：
-  - 后端 `stageForHits`（room-server.js:94-98）`<6 SWAGGER / <11 DAZED / <18 SMOKING / else ASH`，函数 JSDoc(:92) 与文件头注释(:25) 同口径。✓
-  - 前端 `app/js/villain.js:3` 头注释 `嚣张 0–5 / 懵逼 6–10 / 冒烟 11–17 / 化灰 18`。✓
-  - `design.md` §6 表（:245-249 区间 0–5/6–10/11–17/18）与表达式(:252)`hits<6?… hits<11?… hits<18?…` 同口径。✓
-- **后端测试已改新阈值且全绿**（读取记录，tests 15 pass）：
-  - `stageForHits` 边界用例(:46-53) 覆盖 0/5/6/10/11/17/18。✓
-  - `recomputeStage`(:56-65) 用 hits=6 跨入 DAZED、hits=10 同阶段无跨越。✓
-  - `applyHit 累加`(:78-82) 打 6 次断言 hits=6、DAZED。✓
-  - `applyHit 封顶`(:85-92) 超打 100 次断言 `hits===TARGET_HITS`、ASH、burned、FORTUNE、fortune 锁定。✓
-  - 集成(:136-165) victim 12 + shaman 12 = 24 次超打，断言 `burn.hits===TARGET_HITS`、两端签文一致、重连 `snap.hits===TARGET_HITS`。✓
-- **文档旧 8 表述已更新**：README.md:60/72/73、requirements.md:9/91/94/103/238、design.md:9/155/221/243/252/358、民俗合规.md:37 均为 18 口径。`grep` 旧阈值 `0–2/3–4/5–7`、`hits<3/<5/<8` 无遗留命中。✓
-- **文案未被改动**：三语咒语与开打字幕四句粤语念白所在文件（`app/js/audio.js`、`app/js/screens/beat.js`）不在两次提交内；字幕文本仍在位。✓
+前端路由三条规则正确：`victim + altar + flower 空 → altar`、`victim + altar + flower 非空 → invite`、`shaman + altar（无论 flower）→ invite`（经由 shaman-waiting 子视图按 flower 空/非空切「正在重新立牌」与新小人信息）。关键细节是 reset→relist 时神婆 invite 屏的 key 与子视图都不变，`renderRoute` 挂载守卫会提前 return，作者用 `refreshShamanWaiting` 在 `room_state` 到达时就地强制重绘，补上了这个重渲染缺口。
 
-## 任务 2：挥击工具改拖鞋
+store reset 分支显式写入 `s.flower = snapshot.flower ?? ''`、`s.crimes = ...`，绕过常规 `?? s.flower` 可能的旧值残留，reset 后 hits 仍归 0（既有分支逻辑未变）。altar 双路径按 `roomCode` 有无分流 relist/create_room，两路径都先过 `checkFlower`。
 
-- **重画为一眼可辨拖鞋**（villain.js `_drawSlipper` :452-563）：前宽后窄胶囊鞋底轮廓（PAPER 填充 + GOLD 金边）+ Y 字人字夹趾带（RED 带面、GOLD 描边、PURPLE 夹趾钉）。鞋底沿鞋头→鞋跟长轴布局，鞋底平面朝命中点（“拍下去”那一面）。朝向合理。✓
-- **保留三段挥击 tween**（`_drawSwing` :411-444）：快速入 0→0.55、命中定格 0.55→0.70、回弹 0.70→1 相位时序未改，末尾调用 `_drawSlipper(...)`。✓
-- **`swingAt(part)` 头/肚/腿逻辑保留**（:138-152）：`this.parts[part] ? part : 'belly'` 兜底，命中点取部位矩形中心，起点屏外右上；未改动。✓
-- **配色合规**：仅用四色常量 RED/GOLD/PURPLE/INK + 纸面米黄 PAPER（:10-14 定义）。红/紫细条纹为“红白蓝胶拖”暗示，白用纸面米黄代。无血腥、无伤口，朱砂红未作血（RED 仅用于鞋带/条纹/冲击弧边）。命中定格 impact>0 叠 GOLD 冲击短弧 + PURPLE 紫星，原反馈迁移保留。✓
-- **注释/文案改拖鞋**：`grep -rni "shoehorn|鞋拔"` 于 `app/js` 无结果；旧 `_drawShoehorn` 已删除，无残留。`beat.js` 的 👟「抄鞋开打」文案不含鞋拔子字样，未受影响。✓
+合规面保持：无 `.env`/`node_modules`/mp3 入库，`compliance.js` 未改，新增 CSS 仅用锁定四色 + ink。
 
-## 合规与收尾
+<details>
+<summary>Issues (2)</summary>
 
-- `compliance.js` 不在两次提交内，花名拦截逻辑未动。✓
-- 神婆开坛法事页、部位差异化反应 + 拟声词、BGM + 字幕、三语配音 mp3 均未在本次提交触碰（提交仅含 villain.js + 文档/测试/config）。✓
-- `app/assets/audio/` 三个 mp3（beat-bgm / spell-en-US / spell-zh-HK）仍 git 跟踪，两次提交未改动。✓
-- 未提交 `.env` / `node_modules`（`grep` 提交文件列表无命中）。工作树中 `.env` 无、根目录 mp3 与 `.agents/` 工件保持未跟踪，未被牵连。✓
-- 提交为约定式（feat:），按文件名精确提交；FEAT-003.json 的工作树删除为未提交的历史工件变更，属本次范围外，不影响评审。✓
+1. **夹带的复制降级改动** — commit 与未提交的 `theme.css` 把邀请链接复制的多级降级（clipboard→execCommand→手动复制框）一并带入，属于另一桩「复制链接不生效」缺陷，与重启需求同坛不同事；功能无害且色彩合规，但建议确认是否应单独成提交/单独评审。(possible)
+2. **relist 被拒后 altar 按钮不回弹（仅对抗性客户端可达）** — altar 点击后 `createBtn.disabled=true`，若 relist 被服务端静默拒绝且 flower 仍空，苦主停在 altar 屏、`renderRoute` 因屏未变提前 return，按钮保持 disabled 不恢复。正常链路下 `validate()`（name≥1）+ 服务端 flower 非空校验一致，不可触发；仅手工构造空 flower 提交才可能。可在 relist 失败路径给按钮兜底回弹，优先级低。(possible)
 
-## 判定
+</details>
 
-无阻断性问题，APPROVED。
+<details>
+<summary>Details</summary>
+
+### reset 新语义：清空身份进入「待重新立牌」态
+
+`resetRoom` 在原有 `hits=0 / villainStage=嚣张 / burned=false / fortune=null / lang=null / phase=altar` 基础上追加 `room.flower=''`、`room.crimes=[]`，保留 `code/target/members/_cleanupTimer`（不踢人、不换房间码）。函数注释与 design.md §3「重开一坛转移」「状态机 altar 子态」「§4.1 reset 行」同步更新，口径一致。单测 `resetRoom: 进度归零 + 清空花名/罪状进入待重新立牌态` 把旧的「保留花名/罪状」断言改为 `flower===''`、`crimes===[]`，并保留 `code==='AAAAAA'`、`members.size===2`，覆盖到位。
+
+### relist：受控的身份重写
+
+`handleRelist` 经 `requireRoom` 取房后依次校验三道闸：`meta.role !== 'victim'` → 静默回快照；`room.phase !== altar || room.flower !== ''` → 静默回快照；`data.flower` trim 后 `length < 1` → 静默回快照。三者都 `console.debug` 并 `singleSend(ws,'room_state',...)`，不下发 error，与 design §4.5 的 `PHASE_REJECTED` 口径一致。通过后写 `room.flower`/`room.crimes`（crimes 非数组兜底 `[]`），`phase` 维持 `altar`，`broadcastSnapshot(room,'room_state')` 同步神婆。`switch` 中 `case 'relist'` 紧邻 `reset` 注册，未误用 create_room，`makeSnapshot` 无需改（flower/crimes 本就在快照内）。
+
+```
+fortune(hits=18) --reset--> altar(flower='')  待重新立牌
+                                   │ victim relist{flower,crimes}
+                                   ▼
+                            altar(flower≠'')   已立牌（同首次 create_room 后）
+                                   │ set_lang
+                                   ▼
+                            chanting → beating → ...
+```
+
+集成用例覆盖了：双人 reset→relist 后两端快照 `flower==='新花名'`、`crimes===['摸鱼']`、`phase==='altar'`、`members.length===2`、`roomCode` 不变，且随后 `set_lang` 能把两端推进 `chanting`（证明后续流程续得上）；非待立牌态（刚建房 flower 非空）发 relist 只回一帧、flower 不变、`waitFor('error',300)` reject；神婆越权发 relist flower 保持空、同样不下发 error。三组分别锁住了同步、阶段闸、权限闸。
+
+### 前端路由三态分流
+
+`screenForState` 的 `case 'altar'`：`!flower` 时 `role==='shaman'→invite`、否则 `altar`；`flower` 非空统一 `invite`。最前置的「神婆待进房（pendingJoinRoom && !roomCode）→invite」判断保留。`inviteSubview` 把 invite 屏细分 `shaman-pending / shaman-waiting / in-room`，`renderRoute` 的 `subviewChanged` 在子视图语义切换时打破挂载守卫。
+
+reset→relist 过程中神婆停在 `invite` 屏且子视图恒为 `shaman-waiting`（flower 空非空都归 shaman-waiting），`subviewChanged` 为 false 会提前 return，单靠路由不会重绘等待页。作者在 `room_state` handler 里对 `app.current==='invite' && role==='shaman'` 调 `refreshShamanWaiting(app)` 就地重绘，补上这个缺口——这是本次改动里最容易漏掉的一处，处理正确。`refreshShamanWaiting` 内再校验 `role==='shaman'` 与非 pending 态后才 `renderShamanWaiting`，避免误绘。
+
+### store reset 分支显式清空 flower/crimes
+
+reset 绕过分支（`phase==='altar' && hits===0 && s.hits>0`）内追加 `s.flower = snapshot.flower ?? ''`、`s.crimes = Array.isArray(snapshot.crimes) ? snapshot.crimes : []`。此分支本就绕过下方 `Math.max` 单调防回退并显式清 burned/fortune，现在一并清身份，使本地镜像真正进入待重新立牌态，不被常规分支的 `?? s.flower`（对空串放行但此分支根本不走常规赋值）或未赋值残留卡住旧花名。hits 归零逻辑未动，reset 后 hits=0 成立。`store.test.js` 新断言先置旧 flower/crimes 再喂 reset 快照，验证清空。
+
+### altar 双路径开坛
+
+`initAltar` 读 `app.store.state.roomCode`：有值发 `relist{roomCode,flower,crimes}`、无值发 `create_room`，按钮文案据此在「🔥 重新开坛/🔥 开坛」间切换。两路径的点击处理都先 `checkFlower(flower)`，命中真名则提示 return 不发送——重新立牌路径的合规红线仍在。
+
+### 单人 vs 双人
+
+单人：reset→苦主回 altar（flower 空、role 非 shaman）→relist（victim 校验过）→回 invite 邀请屏→set_lang 推进。双人：reset→苦主回 altar、神婆 invite 屏经 refreshShamanWaiting 显示「苦主正在重新立牌，稍候…」→relist→双端收 room_state、神婆 refreshShamanWaiting 重绘出新花名+罪状→续念咒/开打，房间码与成员不变。集成测试覆盖双人链路；单人链路由 relist victim 校验与前端路由覆盖，逻辑成立。
+
+### 验证证据
+
+commit message 与 plan「实现验证记录」均记录：后端 `npm test` 21 pass 0 fail（含改后 reset 单测/集成 + relist 三组）、前端 `node --test store/invite/compliance` 17 pass 0 fail、`node --check` 五个改动文件通过。按评审约定未重跑套件；窄范围抽查复核：`node --check` 五文件全过，diff 中确实存在所述的 reset 单测改写与 relist 三组集成用例，证据可信。手测（步骤 9）为运行期人工冒烟，作者明确标注未在自动化环境执行，由集成用例覆盖等价逻辑链路，可接受。
+
+### 夹带的复制降级改动
+
+commit 顺带引入 `invite.js` 的 `copyText`（clipboard→execCommand 两级降级）、`selectTextIn`、复制失败时的「手动复制链接框」，以及未提交的 `theme.css` `.copy-fallback` 样式。这些对应 original request 里「复制邀请链接没作用」那桩缺陷，与「重新开始」需求同一坛内但属不同关注点。功能本身无害：`escapeHtml` 对注入链接做了转义，样式仅用 `var(--liu-jin-gold)`、`rgba(20,10,31,*)`（ink）、`rgba(244,196,48,*)`（gold），落在锁定四色 + ink 内，合规。仅从评审洁净度角度建议确认是否应单独成提交。
+
+</details>
+
+<details>
+<summary>File map</summary>
+
+- `server/room-server.js` — `resetRoom` 追加清空 flower/crimes；新增 `handleRelist` + switch 注册 `relist`。
+- `app/js/main.js` — `screenForState` altar 分支按 role+flower 分流；`room_state` 到达时对神婆 invite 屏调 `refreshShamanWaiting`。
+- `app/js/store.js` — reset 绕过分支显式清空 flower/crimes。
+- `app/js/screens/altar.js` — 双路径开坛（relist/create_room，均过 checkFlower）+ 按钮文案切换。
+- `app/js/screens/invite.js` — `renderShamanWaiting` 支持「待重新立牌」态；新增 `refreshShamanWaiting`；顺带复制多级降级（copyText/selectTextIn/手动复制框）。
+- `app/js/store.test.js` — reset 清空 flower/crimes 新断言。
+- `server/room-server.test.js` — resetRoom 单测改为断言清空身份、保留成员/房间码。
+- `server/room-server.integration.test.js` — relist 三组集成用例（同步+续局、非待立牌态拒绝、越权拒绝）。
+- `.kiro/specs/kick-bad-guy/design.md` — §3 状态机 + §4.1/§4.5 协议同步 reset 新语义与 relist。
+- `app/css/theme.css`（未提交）— 新增 `.copy-fallback` 样式，四色合规。
+
+完整 diff：`git -C 1-kickbadguy show 49be18b`
+
+</details>
