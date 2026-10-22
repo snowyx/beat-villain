@@ -4,8 +4,10 @@
 # Node 依赖
 node_modules/
 
-# 预生成音频：由 scripts/generate-audio.mjs 本地生成，不提交
-assets/audio/*.mp3
+# 项目根的预生成/素材音频：由 scripts/generate-audio.mjs 本地生成或作素材备份，不提交
+/assets/audio/*.mp3
+# 注意：app/assets/audio/ 下的 mp3 是运行时必需资产（三语咒语配音 + 开打 BGM），
+#       必须随前端一起部署，故不在此忽略——见已跟踪的 spell-*.mp3 与 beat-bgm.mp3。
 
 # macOS
 .DS_Store
